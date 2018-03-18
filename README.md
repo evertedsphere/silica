@@ -1,6 +1,6 @@
 # silica
 
-Haskell optics with amazing type errors.
+Haskell optics with type errors useful enough to teach people.
 
 ```
 $ nix-shell

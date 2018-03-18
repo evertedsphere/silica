@@ -66,9 +66,7 @@ error = panic . strConv Strict
 -- basic types
 --------------------------------------------------------------------------------
 
--- TODO remove the `k` parameter since it's always (->)
 type Silica 
-  (k :: * -> * -> *) 
   (p :: * -> * -> *) 
   (q :: * -> * -> *) 
   (f :: * -> *) 
@@ -76,18 +74,17 @@ type Silica
   (t :: *) 
   (a :: *) 
   (b :: *) 
-  = (a `p` f b) `k` (s `q` f t)
+  = (a `p` f b) -> (s `q` f t)
 
 type family Cts 
   (o :: *) 
-  (k :: * -> * -> *) 
   (p :: * -> * -> *) 
   (q :: * -> * -> *) 
   (f :: * -> *) 
   = (c :: Constraint)
 
-type    Sand o k p q f s t a b     = Cts o k p q f => Silica k p q f s t a b
-type    Glass   o      s t a b     = forall p q f k. Sand o k p q f s t a b
+type    Sand o p q f s t a b       = Cts o p q f => Silica p q f s t a b
+type    Glass   o      s t a b     = forall p q f k. Sand o p q f s t a b
 newtype Optic   o      s t a b     = Optic { runOptic :: Glass o s t a b }
 
 type    Optic'  o      s  a        = Optic o s s a a
@@ -125,7 +122,6 @@ data A_Ixed (i :: *) (o :: *)
 data SubProxy 
   (o :: *) 
   (l :: *) 
-  (k :: * -> * -> *) 
   (p :: * -> * -> *) 
   (q :: * -> * -> *) 
   (f :: * -> *) 
@@ -134,8 +130,8 @@ data SubProxy
 sub :: forall o l s t a b . (o <: l) => Optic o s t a b -> Optic l s t a b
 sub (Optic o) = Optic (implies' o)
   where
-    implies' :: forall k p q f. Sand o k p q f s t a b -> Sand l k p q f s t a b
-    implies' = implies (SubProxy @o @l @k @p @q @f)
+    implies' :: forall p q f. Sand o p q f s t a b -> Sand l p q f s t a b
+    implies' = implies (SubProxy @o @l @p @q @f)
 
 subOut :: (o <: l) => (r -> Optic o s t a b) -> r -> Optic l s t a b
 subOut f = sub . f
@@ -145,7 +141,7 @@ subIn f = f . sub
 
 -- | Read "can act as" or "is".
 class    o <: l where 
-  implies :: proxy o l k p q f -> (Cts o k p q f => r) -> (Cts l k p q f => r)
+  implies :: proxy o l p q f -> (Cts o p q f => r) -> (Cts l p q f => r)
 
 instance o <: o where implies _ r = r
 
@@ -536,16 +532,17 @@ type family ErrListFieldTuple a where
     :$$: Text "Then you can use field selector lenses like _1 to access the fields of the tuples inside."
     :$$: Text ""
     :$$: Text "For example,"
-    :$$: Text ">>> [(1,1),(2,4),(3,7)] & sumOf (folded % _2)"
-    :$$: Text "12"
+    :$$: WithPromptColoured 'Green (Text "[(1,1),(2,4),(3,7)] & sumOf (folded % _2)")
+    :$$: ColourText 'Cyan (Text "12")
     :$$: Text ""
-    :$$: Text ">>> [(1,1),(2,4),(3,7)] & sumOf _2"
-    :$$: Text "<this error>"
+    :$$: WithPromptColoured 'Green (Text "[(1,1),(2,4),(3,7)] & sumOf _2")
+    :$$: ColourText 'Cyan (Text "<this error>")
     :$$: Text ""
     :$$: Text "Use `folded` as many times as you need to to drill down into nested structures."
     :$$: Text "For example, here's a nested list:"
-    :$$: Text ">>> [[(1,1),(2,4),(3,7)],[(5,6)],[(2,1),(4,3)]] & sumOf (folded % folded % _2)"
-    :$$: Text "22"
+    :$$: Text ""
+    :$$: WithPromptColoured 'Green (Text "[[(1,1),(2,4),(3,7)],[(5,6)],[(2,1),(4,3)]] & sumOf (folded % folded % _2)")
+    :$$: ColourText 'Cyan (Text "22")
   ErrListFieldTuple _ = Text ""
 
 instance TypeError (ErrListField 1 a) => Field1 [a] [b] c d where
@@ -784,37 +781,37 @@ data Bogus
 class TypeError (Text "Absurd!") => Absurd where
 
 type Fn k = k ~ (->)
-type Fn3 k p q = (k ~ (->), p ~ (->), q ~ (->))
+type Fn2 p q = (p ~ (->), q ~ (->))
 
 --------------------------------------------------------------------------------
 -- optic constraints
 --------------------------------------------------------------------------------
 
-type instance Cts A_Equality    k p q f = (Fn k, p ~ q)
-type instance Cts A_Iso         k p q f = (Fn k, p ~ q, Profunctor p, Functor f)
-type instance Cts A_Review      k p q f = (Fn k, p ~ q, Choice p, Bifunctor p, Settable f)
-type instance Cts A_Prism       k p q f = (Fn k, p ~ q, Choice p, Applicative f)
+type instance Cts A_Equality    p q f = (p ~ q)
+type instance Cts A_Iso         p q f = (p ~ q, Profunctor p, Functor f)
+type instance Cts A_Review      p q f = (p ~ q, Choice p, Bifunctor p, Settable f)
+type instance Cts A_Prism       p q f = (p ~ q, Choice p, Applicative f)
 
-type instance Cts A_Setter      k p q f = (Fn3 k p q, Settable f)
+type instance Cts A_Setter      p q f = (Fn2 p q, Settable f)
 
-type instance Cts A_Lens        k p q f = (Fn3 k p q, Functor f)
-type instance Cts A_Getter      k p q f = (Fn3 k p q, Contravariant f, Functor f)
+type instance Cts A_Lens        p q f = (Fn2 p q, Functor f)
+type instance Cts A_Getter      p q f = (Fn2 p q, Contravariant f, Functor f)
 
-type instance Cts A_Traversal   k p q f = (Fn3 k p q, Applicative f)
-type instance Cts A_Traversal1  k p q f = (Fn3 k p q, Apply f)
+type instance Cts A_Traversal   p q f = (Fn2 p q, Applicative f)
+type instance Cts A_Traversal1  p q f = (Fn2 p q, Apply f)
 
-type instance Cts A_Fold        k p q f = (Fn3 k p q, Contravariant f, Applicative f)
-type instance Cts A_Fold1       k p q f = (Fn3 k p q, Contravariant f, Apply f)
+type instance Cts A_Fold        p q f = (Fn2 p q, Contravariant f, Applicative f)
+type instance Cts A_Fold1       p q f = (Fn2 p q, Contravariant f, Apply f)
 
-type instance Cts (A_Getting r) k p q f = (Fn3 k p q, f ~ Const r)
+type instance Cts (A_Getting r) p q f = (Fn2 p q, f ~ Const r)
 
-type instance Cts Bogus         k p q f = Absurd
+type instance Cts Bogus         p q f = Absurd
 
-type instance Cts (A_Ixed i A_Lens)      k p q f = (Fn k, Fn q, Ixable i p, Functor f)
-type instance Cts (A_Ixed i A_Traversal) k p q f = (Fn k, Fn q, Ixable i p, Applicative f)
-type instance Cts (A_Ixed i A_Setter)    k p q f = (Fn k, Fn q, Ixable i p, Settable f)
-type instance Cts (A_Ixed i (A_Getting r)) k p q f = (Fn k, Fn q, p ~ Indexed_ i, f ~ Const r)
-type instance Cts (A_Ixed i A_Fold)    k p q f = (Fn k, Fn q, Ixable i p, Contravariant f, Applicative f)
+type instance Cts (A_Ixed i A_Lens)      p q f = (Fn q, Ixable i p, Functor f)
+type instance Cts (A_Ixed i A_Traversal) p q f = (Fn q, Ixable i p, Applicative f)
+type instance Cts (A_Ixed i A_Setter)    p q f = (Fn q, Ixable i p, Settable f)
+type instance Cts (A_Ixed i (A_Getting r)) p q f = (Fn q, p ~ Indexed_ i, f ~ Const r)
+type instance Cts (A_Ixed i A_Fold)    p q f = (Fn q, Ixable i p, Contravariant f, Applicative f)
 
 ----------------------------------------------------------------------
 -- composing optics
@@ -1075,3 +1072,28 @@ instance Functor (Exchange a b s) where
 instance Profunctor (Exchange a b) where
   dimap ss tt (Exchange sa bt) = Exchange (sa . ss) (tt . bt)
   {-# INLINE dimap #-}
+
+data Colour = Black | Red | Green | Yellow | Blue | Magenta | Cyan | White | Reset
+
+type family WithPrompt (t :: ErrorMessage) where 
+  WithPrompt t = Text ">>> " :<>: t
+
+type family WithPromptColoured (c :: Colour) (t :: ErrorMessage) where 
+  WithPromptColoured c t = WithPrompt (ColourText c t)
+
+type family ToAnsi_ (c :: Colour) where
+  ToAnsi_ 'Black = "30"
+  ToAnsi_ 'Red = "31"
+  ToAnsi_ 'Green = "32"
+  ToAnsi_ 'Yellow = "33"
+  ToAnsi_ 'Blue = "34"
+  ToAnsi_ 'Magenta = "35"
+  ToAnsi_ 'Cyan = "36"
+  ToAnsi_ 'White = "37"
+  ToAnsi_ 'Reset = "0"
+
+type family ToAnsi (c :: Colour) where
+  ToAnsi c = Text "\ESC[" :<>: Text (ToAnsi_ c) :<>: Text "m\STX"
+
+type family ColourText (c :: Colour) (t :: ErrorMessage) where
+  ColourText c t = ToAnsi c :<>: t :<>: ToAnsi 'Reset
