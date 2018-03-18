@@ -568,11 +568,6 @@ combine f g1 g2 = to (f <$> view g1 <*> view g2)
 infixl 6 +.
 infixl 7 *.
 
--- instance Num a => Num (Getting a s a) where
---   fromInteger n = sub (to (const (fromInteger n)))
---   g + h = sub (combine (+) g h)
---   g * h = sub (combine (*) g h)
-
 --------------------------------------------------------------------------------
 -- combinators
 -------------------------------------------------------------------------------- 
@@ -709,8 +704,8 @@ foldring fr = Optic (\f -> phantom . fr (\a fa -> f a *> fa) noEffect)
 
 -- | Obtain 'FoldWithIndex' by lifting 'ifoldr' like function.
 ifoldring 
-  :: (forall p f. (Contravariant f, Applicative f) => (i -> a -> f a -> f a) -> f a -> s -> f a) 
-  -> Optic (A_Ixed i A_Fold) s s a a
+  :: (forall f. (Contravariant f, Applicative f) => (i -> a -> f a -> f a) -> f a -> s -> f a) 
+  -> IxedFold i s a
 ifoldring ifr = Optic (\f -> phantom . ifr (\i a fa -> indexed f i a *> fa) noEffect)
 {-# INLINE ifoldring #-}
 
@@ -730,7 +725,7 @@ folded = Optic (conjoined (runOptic (foldring foldr)) (runOptic (ifoldring ifold
 {-# INLINE folded #-}
 
 ifoldr :: Foldable f => (Int -> a -> b -> b) -> b -> f a -> b
-ifoldr f z xs = foldr (\ x g i -> i `seq` f i x (g (i+1))) (const z) xs 0
+ifoldr f z xs = foldr (\x g i -> i `seq` f i x (g (i+1))) (const z) xs 0
 {-# INLINE ifoldr #-}
 
 ----------------------------------------------------------------------
@@ -748,7 +743,7 @@ ifoldr f z xs = foldr (\ x g i -> i `seq` f i x (g (i+1))) (const z) xs 0
 infixl 8 ^.
 
 -- | Flipped infix version of 'toListOf'.
-(^..) :: AsGetting (Endo [a]) k => s -> Optic' k s a -> [a]
+(^..) :: Squashing [a] k => s -> Optic' k s a -> [a]
 (^..) = flip toListOf
 {-# INLINE (^..) #-}
 
@@ -785,38 +780,38 @@ infixr 4 .~
 data Bogus
 class TypeError (Text "Absurd!") => Absurd where
 
-type Fn k = k ~ (->)
-type Fn2 p q = (p ~ (->), q ~ (->))
-
 --------------------------------------------------------------------------------
 -- optic constraints
 --------------------------------------------------------------------------------
 
-type instance Cts A_Equality    p q f = (p ~ q)
-type instance Cts A_Iso         p q f = (p ~ q, Profunctor p, Functor f)
-type instance Cts A_Review      p q f = (p ~ q, Choice p, Bifunctor p, Settable f)
-type instance Cts A_Prism       p q f = (p ~ q, Choice p, Applicative f)
+type instance Cts Bogus                    p q f = Absurd
 
-type instance Cts A_Setter      p q f = (Fn2 p q, Settable f)
+type Fn k = k ~ (->)
+type Fn2 p q = (p ~ (->), q ~ (->))
 
-type instance Cts A_Lens        p q f = (Fn2 p q, Functor f)
-type instance Cts A_Getter      p q f = (Fn2 p q, Contravariant f, Functor f)
+type instance Cts A_Equality               p q f = (p ~ q)
+type instance Cts A_Iso                    p q f = (p ~ q, Profunctor p, Functor f)
+type instance Cts A_Review                 p q f = (p ~ q, Choice p, Bifunctor p, Settable f)
+type instance Cts A_Prism                  p q f = (p ~ q, Choice p, Applicative f)
 
-type instance Cts A_Traversal   p q f = (Fn2 p q, Applicative f)
-type instance Cts A_Traversal1  p q f = (Fn2 p q, Apply f)
+type instance Cts A_Setter                 p q f = (Fn2 p q, Settable f)
 
-type instance Cts A_Fold        p q f = (Fn2 p q, Contravariant f, Applicative f)
-type instance Cts A_Fold1       p q f = (Fn2 p q, Contravariant f, Apply f)
+type instance Cts A_Lens                   p q f = (Fn2 p q, Functor f)
+type instance Cts A_Getter                 p q f = (Fn2 p q, Contravariant f, Functor f)
 
-type instance Cts (A_Getting r) p q f = (Fn2 p q, f ~ Const r)
+type instance Cts A_Traversal              p q f = (Fn2 p q, Applicative f)
+type instance Cts A_Traversal1             p q f = (Fn2 p q, Apply f)
 
-type instance Cts Bogus         p q f = Absurd
+type instance Cts A_Fold                   p q f = (Fn2 p q, Contravariant f, Applicative f)
+type instance Cts A_Fold1                  p q f = (Fn2 p q, Contravariant f, Apply f)
 
-type instance Cts (A_Ixed i A_Lens)      p q f = (Fn q, Ixable i p, Functor f)
-type instance Cts (A_Ixed i A_Traversal) p q f = (Fn q, Ixable i p, Applicative f)
-type instance Cts (A_Ixed i A_Setter)    p q f = (Fn q, Ixable i p, Settable f)
+type instance Cts (A_Getting r)            p q f = (Fn2 p q, f ~ Const r)
+
+type instance Cts (A_Ixed i A_Lens)        p q f = (Fn q, Ixable i p, Functor f)
+type instance Cts (A_Ixed i A_Traversal)   p q f = (Fn q, Ixable i p, Applicative f)
+type instance Cts (A_Ixed i A_Setter)      p q f = (Fn q, Ixable i p, Settable f)
 type instance Cts (A_Ixed i (A_Getting r)) p q f = (Fn q, p ~ Indexed_ i, f ~ Const r)
-type instance Cts (A_Ixed i A_Fold)    p q f = (Fn q, Ixable i p, Contravariant f, Applicative f)
+type instance Cts (A_Ixed i A_Fold)        p q f = (Fn q, Ixable i p, Contravariant f, Applicative f)
 
 ----------------------------------------------------------------------
 -- composing optics
@@ -834,6 +829,11 @@ instance Chain A_Setter where l %% r = Optic (runOptic l . runOptic r)
 instance Chain (A_Getting r) where l %% r = Optic (runOptic l . runOptic r)
 
 instance Chain (A_Ixed i A_Fold) where l %% r = Optic (runOptic l . runOptic r)
+instance Chain (A_Ixed i A_Lens) where l %% r = Optic (runOptic l . runOptic r)
+instance Chain (A_Ixed i A_Setter) where l %% r = Optic (runOptic l . runOptic r)
+instance Chain (A_Ixed i A_Traversal) where l %% r = Optic (runOptic l . runOptic r)
+-- instance Chain (A_Ixed i A_Fold1) where l %% r = Optic (runOptic l . runOptic r)
+-- instance Chain (A_Ixed i (A_Getting r)) where l %% r = Optic (runOptic l . runOptic r)
 
 --------------------------------------------------------------------------------
 -- the subtyping lattice

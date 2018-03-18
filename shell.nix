@@ -37,28 +37,45 @@ in
       hlint
       stylish-haskell
 
+      ghc-proofs
+
       mtl
-
-      bifunctors
-      distributive
-      free
-      kan-extensions
-      comonad
-      profunctors
-      adjunctions
-      semigroupoids
-      semigroups
-      void
-      contravariant
-      pointed
-      tagged
       constraints
-      reflection
-
-      unordered-containers
       protolude
 
-      ghc-proofs
+      array
+      base
+      base-orphans
+      bifunctors
+      bytestring
+      call-stack
+      comonad
+      containers
+      contravariant
+      distributive
+      exceptions
+      filepath
+      free
+      generic-deriving
+      ghc-prim
+      hashable
+      kan-extensions
+      mtl
+      nats
+      parallel
+      profunctors
+      reflection
+      semigroupoids
+      semigroups
+      tagged
+      template-haskell
+      text
+      th-abstraction
+      transformers
+      unordered-containers
+      vector
+      void
+
     ];
 
     # Optionally, also add sets of related packages that are

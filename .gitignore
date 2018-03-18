@@ -22,3 +22,5 @@ cabal.project.local~
 .ghc.environment.*
 _shake/*
 output/*
+src/Control/
+on-hold/
