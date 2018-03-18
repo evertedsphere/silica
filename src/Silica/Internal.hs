@@ -38,7 +38,6 @@ import Control.Applicative
 import Control.Arrow as Arrow
 import Control.Category
 import Control.Comonad
-import Control.Lens.Internal.Instances ()
 import Control.Monad
 import Control.Monad.Fix
 import Data.Distributive
@@ -52,13 +51,11 @@ import Data.Profunctor.Sieve
 import Data.Traversable
 import Prelude hiding ((.),id)
 import Data.Profunctor.Unsafe
-import Control.Lens.Internal.Coerce
+import Data.Coerce
 
--- $setup
--- >>> :set -XNoOverloadedStrings
--- >>> import Control.Lens
--- >>> import Numeric.Lens
---
+coerce' :: forall a b. Coercible a b => b -> a
+coerce' = coerce (id :: a -> a)
+
 ------------------------------------------------------------------------------
 -- Conjoined
 ------------------------------------------------------------------------------

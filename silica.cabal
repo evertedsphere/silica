@@ -22,77 +22,8 @@ library
   hs-source-dirs:      src
   default-language:    Haskell2010
   build-depends:       base >=4.10 && <4.11
-                     , clay
-                     , filepath
-                     , type-of-html
-                     , text
-                     , lens-aeson
-                     , hinotify
-                     , fsnotify
-                     , foldl
-                     , binary
-                     , unordered-containers
-                     , lens
-                     , protolude
-                     , mmark
-                     , skylighting
-                     , mmark-ext
-                     , shake
-                     , shake-path
-                     , path
-                     , vinyl
-                     , vinyl-utils
-                     , singletons
-                     , servant
-                     , servant-server
-                     , servant-generic
-                     , aeson
-                     , aeson-compat
-                     , attoparsec
-                     , base-compat
-                     , bytestring
-                     , containers
-                     , directory
-                     , http-api-data
-                     , http-client
-                     , http-media
-                     , http-types
+
                      , mtl
-                     , string-conversions
-                     , text
-                     , transformers
-                     , blaze-html
-                     , blaze-markup
-                     , wai
-                     , wai-app-static
-                     , warp                  
-                     , directory
-                     , time
-                     , lucid
-                     , htoml-megaparsec
-                     , toml-parser
-                     , lens-toml-parser
-                     , stache
-                     , hashable
-                     , hint
-
-                     , pandoc
-                     , pandoc-types
-
-                     , JuicyPixels
-                     , temporary
-                     , process
-                     , errors
-                     , esqueleto
-                     , persistent
-                     , selda
-                     , selda-sqlite
-                     , selda-postgresql
-                     , sqlite-simple
-                     , postgresql-simple
-                     , managed
-                     , stm
-                     , stm-containers
 
                      , bifunctors
                      , distributive
@@ -101,13 +32,16 @@ library
                      , comonad
                      , profunctors
                      , adjunctions
-                     , pointed
                      , semigroupoids
                      , semigroups
                      , void
                      , contravariant
-                     , reflection
-                     , constraints
+                     , pointed
                      , tagged
+                     , constraints
+                     , reflection
+
+                     , unordered-containers
+                     , protolude
 
                      , ghc-proofs

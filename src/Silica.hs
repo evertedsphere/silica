@@ -56,7 +56,6 @@ import Data.Profunctor.Unsafe
 import Data.Functor.Apply
 
 import Data.Functor.Compose
-import Control.Applicative.Backwards
 
 import Silica.Internal
 
@@ -67,6 +66,7 @@ error = panic . strConv Strict
 -- basic types
 --------------------------------------------------------------------------------
 
+-- TODO remove the `k` parameter since it's always (->)
 type Silica 
   (k :: * -> * -> *) 
   (p :: * -> * -> *) 
@@ -233,9 +233,6 @@ class (IxedFunctor i t, IxedFoldable i t, Traversable t)
   itraverse :: Applicative f => (i -> a -> f b) -> t a -> f (t b)
 
 newtype WithIndex i a b = WithIndex { withIndex :: (i -> a) -> b }
-
-coerce' :: forall a b. Coercible a b => b -> a
-coerce' = coerce (id :: a -> a)
 
 --------------------------------------------------------------------------------
 -- constraint synonyms for optic-flexibility in input
@@ -1051,11 +1048,6 @@ instance Settable Identity where
   {-# INLINE untaintedDot #-}
   taintedDot = (Identity #.)
   {-# INLINE taintedDot #-}
-
--- | 'Control.Lens.Fold.backwards'
-instance Settable f => Settable (Backwards f) where
-  untainted = untaintedDot forwards
-  {-# INLINE untainted #-}
 
 instance (Settable f, Settable g) => Settable (Compose f g) where
   untainted = untaintedDot (untaintedDot getCompose)
