@@ -25,7 +25,7 @@ module Silica where
 
 import GHC.Exts (Constraint)
 import GHC.TypeLits hiding (type (*))
-import Data.Kind
+import Data.Kind hiding (type (*))
 import Data.Bifunctor
 import Data.Foldable
 import Data.Constraint
@@ -67,20 +67,20 @@ error = panic . strConv Strict
 --------------------------------------------------------------------------------
 
 type Silica 
-  (p :: * -> * -> *) 
-  (q :: * -> * -> *) 
-  (f :: * -> *) 
-  (s :: *) 
-  (t :: *) 
-  (a :: *) 
-  (b :: *) 
+  (p :: Type -> Type -> Type) 
+  (q :: Type -> Type -> Type) 
+  (f :: Type -> Type) 
+  (s :: Type) 
+  (t :: Type) 
+  (a :: Type) 
+  (b :: Type) 
   = (a `p` f b) -> (s `q` f t)
 
 type family Cts 
-  (o :: *) 
-  (p :: * -> * -> *) 
-  (q :: * -> * -> *) 
-  (f :: * -> *) 
+  (o :: Type) 
+  (p :: Type -> Type -> Type) 
+  (q :: Type -> Type -> Type) 
+  (f :: Type -> Type) 
   = (c :: Constraint)
 
 type    Sand o p q f s t a b       = Cts o p q f => Silica p q f s t a b
@@ -90,14 +90,8 @@ newtype Optic   o      s t a b     = Optic { runOptic :: Glass o s t a b }
 type    Optic'  o      s  a        = Optic o s s a a
 type    Glass'  o      s  a        = Glass o s s a a
 
-type family IxKey (s :: *) :: *
-type family IxVal (s :: *) :: *
-
-type instance IxKey [a] = Int
-type instance IxVal [a] = a
-
 --------------------------------------------------------------------------------
--- optic tags
+-- optic tags and TFs
 --------------------------------------------------------------------------------
 
 data A_Lens
@@ -111,20 +105,26 @@ data A_Fold
 data A_Fold1
 data A_Setter
 data A_Getter
-data A_Getting (r :: *)
+data A_Getting (r :: Type)
 
-data A_Ixed (i :: *) (o :: *)
+data A_Ixed (i :: Type) (o :: Type)
+
+type family IxKey (s :: Type) :: Type
+type family IxVal (s :: Type) :: Type
+
+type instance IxKey [a] = Int
+type instance IxVal [a] = a
 
 --------------------------------------------------------------------------------
 -- fiddly bits for subtyping and composition
 --------------------------------------------------------------------------------
 
 data SubProxy 
-  (o :: *) 
-  (l :: *) 
-  (p :: * -> * -> *) 
-  (q :: * -> * -> *) 
-  (f :: * -> *) 
+  (o :: Type) 
+  (l :: Type) 
+  (p :: Type -> Type -> Type) 
+  (q :: Type -> Type -> Type) 
+  (f :: Type -> Type) 
   = SubProxy
 
 sub :: forall o l s t a b . (o <: l) => Optic o s t a b -> Optic l s t a b
@@ -386,7 +386,7 @@ simple = Optic id
 {-# INLINE simple #-}
 
 -- | Provides a witness of equality.
-data Identical (s :: *) (t :: *) (a :: *) (b :: *) where
+data Identical (s :: Type) (t :: Type) (a :: Type) (b :: Type) where
   Identical :: (s ~ a, t ~ b) => Identical s t a b
 
 -- | Obtain a witness for an equality.
@@ -502,6 +502,10 @@ _Nothing = prism (const Nothing) $ \case
   Nothing -> Right ()
   x -> Left x
 
+--------------------------------------------------------------------------------
+-- generalised tuples
+--------------------------------------------------------------------------------
+
 class Field1 s t a b where
   _1 :: Lens s t a b
 
@@ -514,6 +518,14 @@ instance (a' ~ a, b' ~ b) => Field1 (a, x) (b, x) a' b' where
 instance (a' ~ a, b' ~ b) => Field2 (x, a) (x, b) a' b' where
   _2 = lens snd (\(x,_) b -> (x,b))
 
+instance TypeError (ErrListField 1 a) => Field1 [a] [b] c d where
+  _1 = error "field1"
+
+instance TypeError (ErrListField 2 a) => Field2 [a] [b] c d where
+  _2 = error "field2"
+
+-- errors
+
 type family NatOrdinal n where
   NatOrdinal 1 = "first"
   NatOrdinal 2 = "second"
@@ -522,37 +534,30 @@ type family ErrListField n a where
   ErrListField n a 
     = Text "You tried to access the " :<>: Text (NatOrdinal n) :<>: Text " field of a list."
     :$$: Text "However, a list does not have any \"fields\". Tuples and similar types can."
-    :$$: Text ""
     :$$: ErrListFieldTuple a
-    :$$: Text ""
 
 type family ErrListFieldTuple a where
-  ErrListFieldTuple (x, y) = Text "You have a list of tuples of type " :<>: ShowType (x,y) :<>: Text "."
+  ErrListFieldTuple (x, y) = Text ""
+    :$$: Text "You have a list of tuples of type " :<>: ShowType (x,y) :<>: Text "."
     :$$: Text "Try applying `folded` or a similar combinator to first traverse \"into\" the list."
     :$$: Text "Then you can use field selector lenses like _1 to access the fields of the tuples inside."
     :$$: Text ""
     :$$: Text "For example,"
-    :$$: WithPromptColoured 'Green (Text "[(1,1),(2,4),(3,7)] & sumOf (folded % _2)")
-    :$$: ColourText 'Cyan (Text "12")
+    :$$: Text ">>> [(1,1),(2,4),(3,7)] & sumOf (folded % _2)"
+    :$$: Text "12"
     :$$: Text ""
-    :$$: WithPromptColoured 'Green (Text "[(1,1),(2,4),(3,7)] & sumOf _2")
-    :$$: ColourText 'Cyan (Text "<this error>")
+    :$$: Text ">>> [(1,1),(2,4),(3,7)] & sumOf _2"
+    :$$: Text "<this error>"
     :$$: Text ""
     :$$: Text "Use `folded` as many times as you need to to drill down into nested structures."
     :$$: Text "For example, here's a nested list:"
     :$$: Text ""
-    :$$: WithPromptColoured 'Green (Text "[[(1,1),(2,4),(3,7)],[(5,6)],[(2,1),(4,3)]] & sumOf (folded % folded % _2)")
-    :$$: ColourText 'Cyan (Text "22")
+    :$$: Text ">>> [[(1,1),(2,4),(3,7)],[(5,6)],[(2,1),(4,3)]] & sumOf (folded % folded % _2)"
+    :$$: Text "22"
   ErrListFieldTuple _ = Text ""
 
-instance TypeError (ErrListField 1 a) => Field1 [a] [b] c d where
-  _1 = error "field1"
-
-instance TypeError (ErrListField 2 a) => Field2 [a] [b] c d where
-  _2 = error "field2"
-
 combine :: (Num a, AsGetting a k, AsGetting a l) => (a -> a -> a) -> Optic' k s a -> Optic' l s a -> Getter s a
-combine f g1 g2 = to (\s -> f (s ^. g1) (s ^. g2))
+combine f g1 g2 = to (f <$> view g1 <*> view g2)
 
 (+.) :: (Num a, AsGetting a k, AsGetting a l) => Optic' k s a -> Optic' l s a -> Getter s a
 (+.) = combine (+)
@@ -617,19 +622,19 @@ preview o = asks (getFirst #. foldMapOf o (First #. Just))
 {-# INLINE preview #-}
 
 andOf :: AsGetting All k => Optic' k s Bool -> s -> Bool
-andOf o = getAll . foldMapOf o All
+andOf o = getAll #. foldMapOf o All
 {-# INLINE andOf #-}
 
 orOf :: AsGetting Any k => Optic' k s Bool -> s -> Bool
-orOf o = getAny . foldMapOf o Any
+orOf o = getAny #. foldMapOf o Any
 {-# INLINE orOf #-}
 
 allOf :: AsGetting All k => Optic' k s a -> (a -> Bool) -> s -> Bool
-allOf o f = getAll . foldMapOf o (All . f)
+allOf o f = getAll #. foldMapOf o (All #. f)
 {-# INLINE allOf #-}
 
 anyOf :: AsGetting Any k => Optic' k s a -> (a -> Bool) -> s -> Bool
-anyOf o f = getAny . foldMapOf o (Any . f)
+anyOf o f = getAny #. foldMapOf o (Any #. f)
 {-# INLINE anyOf #-}
 
 noneOf :: AsGetting Any k => Optic' k s a -> (a -> Bool) -> s -> Bool
@@ -880,6 +885,8 @@ instance Semigroup  r => A_Fold1      <: A_Getting r where implies _ r = r
 instance Monoid     r => A_Traversal  <: A_Getting r where implies _ r = r
 instance Semigroup  r => A_Traversal1 <: A_Getting r where implies _ r = r
 
+instance NotSubtypeError A_Setter A_Getter => A_Setter                       <: A_Getting r where implies _ = error "subtype"
+
 instance NotSubtypeError A_Getter A_Setter => A_Getter <: A_Setter where implies _ = error "subtype"
 
 instance NotSubtypeError A_Traversal A_Getter => A_Traversal <: A_Getter where implies _ = error "subtype"
@@ -995,11 +1002,11 @@ type family ShowOptic b where
 type family NotSubtypeError l r where
   NotSubtypeError l r 
        = TypeError 
-       ( Text "The function used "
+       ( Text "A function that you used "
     :<>: Text "requires a "
     :<>: ShowOptic r
-    :<>: Text " argument, "
-    :$$: Text "The optic supplied was only a "
+    :<>: Text " argument. "
+    :$$: Text "The optic supplied was a "
     :<>: ShowOptic l
     :<>: Text ","
     :$$: Text "which cannot be upgraded to the former."
@@ -1014,13 +1021,13 @@ type family NotSubtypeExplanation l r where
     :$$: Text "you can't update or set values using them."
     :$$: Text ""
     :$$: Text "See https://optics-101.com/faq#getter-setter for help."
-  NotSubtypeExplanation l r = Text "NotSubtypeExplanation: internal error: " :$$: ShowType l :$$: ShowType r
+  NotSubtypeExplanation l r = Text "FIXME: no subtyping relation between " :$$: ShowType l :$$: ShowType r
 
 --------------------------------------------------------------------------------
 -- Van Laarhoven types for interop
 --------------------------------------------------------------------------------
 
-type EqualityVL s t a b   = forall (p :: * -> * -> *) (f :: * -> *). p a (f b) -> p s (f t)
+type EqualityVL s t a b   = forall (p :: Type -> Type -> Type) (f :: Type -> Type). p a (f b) -> p s (f t)
 type IsoVL s t a b        = forall p f. (Profunctor p, Functor f) => p a (f b) -> p s (f t)
 type PrismVL s t a b      = forall p f. (Choice p, Applicative f) => p a (f b) -> p s (f t)
 type LensVL s t a b       = forall f. Functor f => (a -> f b) -> s -> f t
