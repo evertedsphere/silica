@@ -83,12 +83,12 @@ type family Cts
   (f :: Type -> Type) 
   = (c :: Constraint)
 
-type    Sand o p q f s t a b       = Cts o p q f => Silica p q f s t a b
-type    Glass   o      s t a b     = forall p q f k. Sand o p q f s t a b
-newtype Optic   o      s t a b     = Optic { runOptic :: Glass o s t a b }
+type    Sand    o p q f s t a b     = Cts o p q f => Silica p q f s t a b
+type    Glass   o       s t a b     = forall p q f. Sand o p q f s t a b
+newtype Optic   o       s t a b     = Optic { runOptic :: Glass o s t a b }
 
-type    Optic'  o      s  a        = Optic o s s a a
-type    Glass'  o      s  a        = Glass o s s a a
+type    Optic'  o       s   a       = Optic o s s a a
+type    Glass'  o       s   a       = Glass o s s a a
 
 --------------------------------------------------------------------------------
 -- optic tags and TFs
@@ -568,10 +568,10 @@ combine f g1 g2 = to (f <$> view g1 <*> view g2)
 infixl 6 +.
 infixl 7 *.
 
-instance Num a => Num (Getting a s a) where
-  fromInteger n = sub (to (const (fromInteger n)))
-  g + h = sub (combine (+) g h)
-  g * h = sub (combine (*) g h)
+-- instance Num a => Num (Getting a s a) where
+--   fromInteger n = sub (to (const (fromInteger n)))
+--   g + h = sub (combine (+) g h)
+--   g * h = sub (combine (*) g h)
 
 --------------------------------------------------------------------------------
 -- combinators
