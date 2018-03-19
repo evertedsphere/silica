@@ -1099,51 +1099,22 @@ type family NotSubtypeExplanation l r where
     :$$: Text "See https://optics-101.com/faq#getter-setter for help."
   NotSubtypeExplanation l r = Text "FIXME: no subtyping relation between " :$$: ShowType l :$$: ShowType r
 
-class (o <: A_Lens) => AsLens o
-instance (o <: A_Lens) => AsLens o
+type AsLens                o = o <: A_Lens
+type AsTraversal           o = o <: A_Traversal
+type AsTraversal1          o = o <: A_Traversal1
+type AsPrism               o = o <: A_Prism
+type AsIso                 o = o <: A_Iso
+type AsEquality            o = o <: A_Equality
+type AsReview              o = o <: A_Review
+type AsFold                o = o <: A_Fold
+type AsFold1               o = o <: A_Fold1
+type AsSetter              o = o <: A_Setter
+type AsIndexedSetter i     o = o <: A_Indexed i A_Setter
+type AsGetter              o = o <: A_Getter
+type AsLensLike f          o = o <: A_LensLike f
+type AsIndexedLensLike i f o = o <: A_Indexed i (A_LensLike f)
+type AsOver p f            o = o <: A_Over p f
+type AsGetting r           o = o <: A_Getting r
 
-class (o <: A_Traversal) => AsTraversal o
-instance (o <: A_Traversal) => AsTraversal o
-
-class (o <: A_Traversal1) => AsTraversal1 o
-instance (o <: A_Traversal1) => AsTraversal1 o
-
-class (o <: A_Prism) => AsPrism o
-instance (o <: A_Prism) => AsPrism o
-
-class (o <: A_Iso) => AsIso o
-instance (o <: A_Iso) => AsIso o
-
-class (o <: A_Equality) => AsEquality o
-instance (o <: A_Equality) => AsEquality o
-
-class (o <: A_Review) => AsReview o
-instance (o <: A_Review) => AsReview o
-
-class (o <: A_Fold) => AsFold o
-instance (o <: A_Fold) => AsFold o
-
-class (o <: A_Fold1) => AsFold1 o
-instance (o <: A_Fold1) => AsFold1 o
-
-class (o <: A_Setter) => AsSetter o
-instance (o <: A_Setter) => AsSetter o
-
-class (o <: A_Getter) => AsGetter o
-instance (o <: A_Getter) => AsGetter o
-
-class (o <: A_LensLike f) => AsLensLike f o
-instance (o <: A_LensLike f) => AsLensLike f o
-
-class (o <: A_Indexed i (A_LensLike f)) => AsIndexedLensLike i f o
-instance (o <: A_Indexed i (A_LensLike f)) => AsIndexedLensLike i f o
-
-class (o <: A_Over p f) => AsOver p f o
-instance (o <: A_Over p f) => AsOver p f o
-
-class (o <: A_Getting r) => AsGetting r o
-instance (o <: A_Getting r) => AsGetting r o
-
-class (o <: A_Getting (Endo r)) => Squashing r o
-instance (o <: A_Getting (Endo r)) => Squashing r o
+type Squashing r o = o <: A_Getting (Endo r)
 

@@ -60,7 +60,7 @@ module Optics
   -- , module Optics.Prism
   -- , module Optics.Reified
   -- , module Optics.Review
-  -- , module Optics.Setter
+  , module Optics.Setter
   -- , module Optics.Traversal
   -- , module Optics.Tuple
   , module Optics.Type
@@ -83,7 +83,7 @@ import Optics.Lens
 -- import Optics.Prism
 -- import Optics.Reified
 -- import Optics.Review
--- import Optics.Setter
+import Optics.Setter
 -- import Optics.Traversal
 -- import Optics.Tuple
 import Optics.Type
