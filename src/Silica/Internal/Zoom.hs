@@ -10,7 +10,7 @@
 {-# OPTIONS_GHC -fno-warn-orphans -fno-warn-warnings-deprecations #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Optics.Internal.Zoom
+-- Module      :  Silica.Internal.Zoom
 -- Copyright   :  (C) 2012-2016 Edward Kmett
 -- License     :  BSD-style (see the file LICENSE)
 -- Maintainer  :  Edward Kmett <ekmett@gmail.com>
@@ -18,7 +18,7 @@
 -- Portability :  non-portable
 --
 ----------------------------------------------------------------------------
-module Optics.Internal.Zoom
+module Silica.Internal.Zoom
   (
   -- * Zoom
     Focusing(..)
@@ -47,7 +47,7 @@ import Prelude hiding ((.),id)
 -- Focusing
 ------------------------------------------------------------------------------
 
--- | Used by 'Optics.Zoom.Zoom' to 'Optics.Zoom.zoom' into 'Control.Monad.State.StateT'.
+-- | Used by 'Silica.Zoom.Zoom' to 'Silica.Zoom.zoom' into 'Control.Monad.State.StateT'.
 newtype Focusing m s a = Focusing { unfocusing :: m (s, a) }
 
 instance Monad m => Functor (Focusing m s) where
@@ -76,7 +76,7 @@ instance (Monad m, Monoid s) => Applicative (Focusing m s) where
 -- FocusingWith
 ------------------------------------------------------------------------------
 
--- | Used by 'Optics.Zoom.Zoom' to 'Optics.Zoom.zoom' into 'Control.Monad.RWS.RWST'.
+-- | Used by 'Silica.Zoom.Zoom' to 'Silica.Zoom.zoom' into 'Control.Monad.RWS.RWST'.
 newtype FocusingWith w m s a = FocusingWith { unfocusingWith :: m (s, a, w) }
 
 instance Monad m => Functor (FocusingWith w m s) where
@@ -105,7 +105,7 @@ instance (Monad m, Monoid s, Monoid w) => Applicative (FocusingWith w m s) where
 -- FocusingPlus
 ------------------------------------------------------------------------------
 
--- | Used by 'Optics.Zoom.Zoom' to 'Optics.Zoom.zoom' into 'Control.Monad.Writer.WriterT'.
+-- | Used by 'Silica.Zoom.Zoom' to 'Silica.Zoom.zoom' into 'Control.Monad.Writer.WriterT'.
 newtype FocusingPlus w k s a = FocusingPlus { unfocusingPlus :: k (s, w) a }
 
 instance Functor (k (s, w)) => Functor (FocusingPlus w k s) where
@@ -126,7 +126,7 @@ instance Applicative (k (s, w)) => Applicative (FocusingPlus w k s) where
 -- FocusingOn
 ------------------------------------------------------------------------------
 
--- | Used by 'Optics.Zoom.Zoom' to 'Optics.Zoom.zoom' into 'Control.Monad.Trans.Maybe.MaybeT' or 'Control.Monad.Trans.List.ListT'.
+-- | Used by 'Silica.Zoom.Zoom' to 'Silica.Zoom.zoom' into 'Control.Monad.Trans.Maybe.MaybeT' or 'Control.Monad.Trans.List.ListT'.
 newtype FocusingOn f k s a = FocusingOn { unfocusingOn :: k (f s) a }
 
 instance Functor (k (f s)) => Functor (FocusingOn f k s) where
@@ -168,7 +168,7 @@ instance Monoid a => Monoid (May a) where
 -- FocusingMay
 ------------------------------------------------------------------------------
 
--- | Used by 'Optics.Zoom.Zoom' to 'Optics.Zoom.zoom' into 'Control.Monad.Error.ErrorT'.
+-- | Used by 'Silica.Zoom.Zoom' to 'Silica.Zoom.zoom' into 'Control.Monad.Error.ErrorT'.
 newtype FocusingMay k s a = FocusingMay { unfocusingMay :: k (May s) a }
 
 instance Functor (k (May s)) => Functor (FocusingMay k s) where
@@ -210,7 +210,7 @@ instance Monoid a => Monoid (Err e a) where
 -- FocusingErr
 ------------------------------------------------------------------------------
 
--- | Used by 'Optics.Zoom.Zoom' to 'Optics.Zoom.zoom' into 'Control.Monad.Error.ErrorT'.
+-- | Used by 'Silica.Zoom.Zoom' to 'Silica.Zoom.zoom' into 'Control.Monad.Error.ErrorT'.
 newtype FocusingErr e k s a = FocusingErr { unfocusingErr :: k (Err e s) a }
 
 instance Functor (k (Err e s)) => Functor (FocusingErr e k s) where
@@ -253,7 +253,7 @@ instance (Applicative f, Monoid a, Monad m) => Monoid (Freed f m a) where
 -- FocusingFree
 ------------------------------------------------------------------------------
 
--- | Used by 'Optics.Zoom.Zoom' to 'Optics.Zoom.zoom' into
+-- | Used by 'Silica.Zoom.Zoom' to 'Silica.Zoom.zoom' into
 -- 'Control.Monad.Trans.FreeT'
 newtype FocusingFree f m k s a = FocusingFree { unfocusingFree :: k (Freed f m s) a }
 

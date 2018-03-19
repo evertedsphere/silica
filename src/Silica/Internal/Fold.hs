@@ -8,7 +8,7 @@
 
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Optics.Internal.Fold
+-- Module      :  Silica.Internal.Fold
 -- Copyright   :  (C) 2012-2016 Edward Kmett
 -- License     :  BSD-style (see the file LICENSE)
 -- Maintainer  :  Edward Kmett <ekmett@gmail.com>
@@ -16,7 +16,7 @@
 -- Portability :  non-portable
 --
 ----------------------------------------------------------------------------
-module Optics.Internal.Fold
+module Silica.Internal.Fold
   (
   -- * Monoids for folding
     Folding(..)
@@ -33,7 +33,7 @@ module Optics.Internal.Fold
   ) where
 
 import Control.Applicative
-import Optics.Internal.Getter
+import Silica.Internal.Getter
 import Data.Functor.Bind
 import Data.Functor.Contravariant
 import Data.Maybe
@@ -68,7 +68,7 @@ instance (Contravariant f, Applicative f) => Monoid (Folding f a) where
 -- Traversed
 ------------------------------------------------------------------------------
 
--- | Used internally by 'Optics.Traversal.traverseOf_' and the like.
+-- | Used internally by 'Silica.Traversal.traverseOf_' and the like.
 --
 -- The argument 'a' of the result should not be used!
 newtype Traversed a f = Traversed { getTraversed :: f a }
@@ -88,7 +88,7 @@ instance Applicative f => Monoid (Traversed a f) where
 -- TraversedF
 ------------------------------------------------------------------------------
 
--- | Used internally by 'Optics.Fold.traverse1Of_' and the like.
+-- | Used internally by 'Silica.Fold.traverse1Of_' and the like.
 --
 -- @since 4.16
 newtype TraversedF a f = TraversedF { getTraversedF :: f a }
@@ -107,7 +107,7 @@ instance (Apply f, Applicative f) => Monoid (TraversedF a f) where
 -- Sequenced
 ------------------------------------------------------------------------------
 
--- | Used internally by 'Optics.Traversal.mapM_' and the like.
+-- | Used internally by 'Silica.Traversal.mapM_' and the like.
 --
 -- The argument 'a' of the result should not be used!
 --
@@ -128,7 +128,7 @@ instance Monad m => Monoid (Sequenced a m) where
 -- Min
 ------------------------------------------------------------------------------
 
--- | Used for 'Optics.Fold.minimumOf'.
+-- | Used for 'Silica.Fold.minimumOf'.
 data Min a = NoMin | Min a
 
 instance Ord a => Semigroup (Min a) where
@@ -155,7 +155,7 @@ getMin (Min a) = Just a
 -- Max
 ------------------------------------------------------------------------------
 
--- | Used for 'Optics.Fold.maximumOf'.
+-- | Used for 'Silica.Fold.maximumOf'.
 data Max a = NoMax | Max a
 
 instance Ord a => Semigroup (Max a) where
@@ -192,7 +192,7 @@ instance Semigroup (NonEmptyDList a) where
 -- Leftmost and Rightmost
 ------------------------------------------------------------------------------
 
--- | Used for 'Optics.Fold.preview'.
+-- | Used for 'Silica.Fold.preview'.
 data Leftmost a = LPure | LLeaf a | LStep (Leftmost a)
 
 instance Semigroup (Leftmost a) where
@@ -221,7 +221,7 @@ getLeftmost LPure = Nothing
 getLeftmost (LLeaf a) = Just a
 getLeftmost (LStep x) = getLeftmost x
 
--- | Used for 'Optics.Fold.lastOf'.
+-- | Used for 'Silica.Fold.lastOf'.
 data Rightmost a = RPure | RLeaf a | RStep (Rightmost a)
 
 instance Semigroup (Rightmost a) where

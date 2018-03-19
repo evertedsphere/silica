@@ -4,7 +4,7 @@
 #endif
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Optics.Internal.Iso
+-- Module      :  Silica.Internal.Iso
 -- Copyright   :  (C) 2012-2016 Edward Kmett
 -- License     :  BSD-style (see the file LICENSE)
 -- Maintainer  :  Edward Kmett <ekmett@gmail.com>
@@ -12,7 +12,7 @@
 -- Portability :  non-portable
 --
 ----------------------------------------------------------------------------
-module Optics.Internal.Iso
+module Silica.Internal.Iso
   ( Exchange(..)
   , Reversing(..)
   ) where
@@ -20,7 +20,7 @@ module Optics.Internal.Iso
 import Data.Profunctor
 #ifndef SAFE
 import Data.Profunctor.Unsafe
-import Optics.Internal.Coerce
+import Silica.Internal.Coerce
 #endif
 import Data.ByteString       as StrictB
 import Data.ByteString.Lazy  as LazyB
@@ -37,7 +37,7 @@ import Data.Sequence         as Seq
 -- Isomorphism: Exchange
 ------------------------------------------------------------------------------
 
--- | This is used internally by the 'Optics.Iso.Iso' code to provide
+-- | This is used internally by the 'Silica.Iso.Iso' code to provide
 -- efficient access to the two functions that make up an isomorphism.
 data Exchange a b s t = Exchange (s -> a) (b -> t)
 

@@ -16,7 +16,16 @@ extra-source-files:  ChangeLog.md
 cabal-version:       >=1.10
 
 library
-  exposed-modules:     Optics
+  exposed-modules:     Silica
+                     , Silica.Internal.Coerce
+                     , Silica.Internal.Context
+                     , Silica.Internal.Getter
+                     , Silica.Internal.Indexed
+                     , Silica.Internal.Instances
+                     , Silica.Internal.Setter
+                     , Silica.Lens
+                     , Silica.Setter
+                     , Silica.Type
   -- other-modules:       
   -- other-extensions:    
   hs-source-dirs:      src

@@ -1,7 +1,7 @@
 {-# LANGUAGE CPP #-}
 -------------------------------------------------------------------------------
 -- |
--- Module      :  Optics.Internal.List
+-- Module      :  Silica.Internal.List
 -- Copyright   :  (C) 2014-2016 Edward Kmett and Eric Mertens
 -- License     :  BSD-style (see the file LICENSE)
 -- Maintainer  :  Edward Kmett <ekmett@gmail.com>
@@ -11,7 +11,7 @@
 -- This module provides utility functions on lists used by the library
 -- implementation.
 -------------------------------------------------------------------------------
-module Optics.Internal.List
+module Silica.Internal.List
   ( ordinalNub
   ) where
 

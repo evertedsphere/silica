@@ -11,7 +11,7 @@
 #endif
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Optics.Internal.PrismTH
+-- Module      :  Silica.Internal.PrismTH
 -- Copyright   :  (C) 2014-2016 Edward Kmett and Eric Mertens
 -- License     :  BSD-style (see the file LICENSE)
 -- Maintainer  :  Edward Kmett <ekmett@gmail.com>
@@ -20,18 +20,18 @@
 --
 -----------------------------------------------------------------------------
 
-module Optics.Internal.PrismTH
+module Silica.Internal.PrismTH
   ( makePrisms
   , makeClassyPrisms
   , makeDecPrisms
   ) where
 
 import Control.Applicative
-import Optics.Fold
-import Optics.Getter
-import Optics.Internal.TH
-import Optics.Lens
-import Optics.Setter
+import Silica.Fold
+import Silica.Getter
+import Silica.Internal.TH
+import Silica.Lens
+import Silica.Setter
 import Control.Monad
 import Data.Char (isUpper)
 import Data.List

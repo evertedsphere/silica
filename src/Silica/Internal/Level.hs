@@ -7,7 +7,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Optics.Internal.Level
+-- Module      :  Silica.Internal.Level
 -- Copyright   :  (C) 2012-2016 Edward Kmett
 -- License     :  BSD-style (see the file LICENSE)
 -- Maintainer  :  Edward Kmett <ekmett@gmail.com>
@@ -15,10 +15,10 @@
 -- Portability :  non-portable
 --
 -- This module provides implementation details of the combinators in
--- "Optics.Level", which provides for the breadth-first 'Optics.Traversal.Traversal' of
--- an arbitrary 'Optics.Traversal.Traversal'.
+-- "Silica.Level", which provides for the breadth-first 'Silica.Traversal.Traversal' of
+-- an arbitrary 'Silica.Traversal.Traversal'.
 ----------------------------------------------------------------------------
-module Optics.Internal.Level
+module Silica.Internal.Level
   (
   -- * Levels
     Level(..)

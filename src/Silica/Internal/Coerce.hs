@@ -19,7 +19,7 @@
 -- This module provides a shim around 'coerce' that defaults to 'unsafeCoerce'
 -- on GHC < 7.8
 -----------------------------------------------------------------------------
-module Optics.Internal.Coerce
+module Silica.Internal.Coerce
   ( coerce
   , coerce'
   ) where

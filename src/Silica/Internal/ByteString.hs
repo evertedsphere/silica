@@ -28,7 +28,7 @@
 -- to work around <http://hackage.haskell.org/trac/ghc/ticket/7556> on older
 -- Haskell Platforms and to improve constant and asymptotic factors in our performance.
 ----------------------------------------------------------------------------
-module Optics.Internal.ByteString
+module Silica.Internal.ByteString
   ( unpackStrict, traversedStrictTree
   , unpackStrict8, traversedStrictTree8
   , unpackLazy, traversedLazy
@@ -39,11 +39,11 @@ module Optics.Internal.ByteString
 import Control.Applicative
 #endif
 
-import Optics.Type
-import Optics.Getter
-import Optics.Fold
-import Optics.Indexed
-import Optics.Setter
+import Silica.Type
+import Silica.Getter
+import Silica.Fold
+import Silica.Indexed
+import Silica.Setter
 import qualified Data.ByteString               as B
 import qualified Data.ByteString.Char8         as B8
 import qualified Data.ByteString.Lazy          as BL

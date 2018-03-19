@@ -5,7 +5,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Optics.Internal.Review
+-- Module      :  Silica.Internal.Review
 -- Copyright   :  (C) 2012-2016 Edward Kmett
 -- License     :  BSD-style (see the file LICENSE)
 -- Maintainer  :  Edward Kmett <ekmett@gmail.com>
@@ -13,7 +13,7 @@
 -- Portability :  non-portable
 --
 ----------------------------------------------------------------------------
-module Optics.Internal.Review
+module Silica.Internal.Review
   (
   -- * Internal Classes
     Reviewable
@@ -36,7 +36,7 @@ instance (Profunctor p, Bifunctor p) => Reviewable p
 
 -- | This is a profunctor used internally to implement "Review"
 --
--- It plays a role similar to that of 'Optics.Internal.Getter.Accessor'
--- or 'Const' do for "Optics.Getter"
+-- It plays a role similar to that of 'Silica.Internal.Getter.Accessor'
+-- or 'Const' do for "Silica.Getter"
 retagged :: (Profunctor p, Bifunctor p) => p a b -> p s b
 retagged = first absurd . lmap absurd

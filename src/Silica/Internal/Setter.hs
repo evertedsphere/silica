@@ -6,7 +6,7 @@
 
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Optics.Internal.Setter
+-- Module      :  Silica.Internal.Setter
 -- Copyright   :  (C) 2012-2016 Edward Kmett
 -- License     :  BSD-style (see the file LICENSE)
 -- Maintainer  :  Edward Kmett <ekmett@gmail.com>
@@ -14,7 +14,7 @@
 -- Portability :  non-portable
 --
 ----------------------------------------------------------------------------
-module Optics.Internal.Setter
+module Silica.Internal.Setter
   (
   -- ** Setters
     Settable(..)
@@ -46,7 +46,7 @@ class (Applicative f, Distributive f, Traversable f) => Settable f where
   taintedDot g = g `seq` rmap pure g
   {-# INLINE taintedDot #-}
 
--- | So you can pass our 'Optics.Setter.Setter' into combinators from other lens libraries.
+-- | So you can pass our 'Silica.Setter.Setter' into combinators from other lens libraries.
 instance Settable Identity where
   untainted = runIdentity
   {-# INLINE untainted #-}
@@ -55,7 +55,7 @@ instance Settable Identity where
   taintedDot = (Identity #.)
   {-# INLINE taintedDot #-}
 
--- | 'Optics.Fold.backwards'
+-- | 'Silica.Fold.backwards'
 instance Settable f => Settable (Backwards f) where
   untainted = untaintedDot forwards
   {-# INLINE untainted #-}

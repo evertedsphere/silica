@@ -12,7 +12,7 @@
 
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Optics.Internal.Context
+-- Module      :  Silica.Internal.Context
 -- Copyright   :  (C) 2012-2016 Edward Kmett
 -- License     :  BSD-style (see the file LICENSE)
 -- Maintainer  :  Edward Kmett <ekmett@gmail.com>
@@ -20,7 +20,7 @@
 -- Portability :  non-portable
 --
 ----------------------------------------------------------------------------
-module Optics.Internal.Context
+module Silica.Internal.Context
   ( IndexedFunctor(..)
   , IndexedComonad(..)
   , IndexedComonadStore(..)
@@ -35,7 +35,7 @@ import Control.Arrow
 import Control.Category
 import Control.Comonad
 import Control.Comonad.Store.Class
-import Optics.Internal.Indexed
+import Silica.Internal.Indexed
 import Data.Functor.Compose
 import Data.Functor.Contravariant
 import Data.Functor.Identity
@@ -123,7 +123,7 @@ class IndexedComonad w => IndexedComonadStore w where
 -- Sellable
 ------------------------------------------------------------------------------
 
--- | This is used internally to construct a 'Optics.Internal.Bazaar.Bazaar', 'Context' or 'Pretext'
+-- | This is used internally to construct a 'Silica.Internal.Bazaar.Bazaar', 'Context' or 'Pretext'
 -- from a singleton value.
 class Corepresentable p => Sellable p w | w -> p where
   sell :: p a (w a b b)
@@ -132,14 +132,14 @@ class Corepresentable p => Sellable p w | w -> p where
 -- Context
 ------------------------------------------------------------------------------
 
--- | The indexed store can be used to characterize a 'Optics.Lens.Lens'
--- and is used by 'Optics.Lens.cloneLens'.
+-- | The indexed store can be used to characterize a 'Silica.Lens.Lens'
+-- and is used by 'Silica.Lens.cloneLens'.
 --
 -- @'Context' a b t@ is isomorphic to
 -- @newtype 'Context' a b t = 'Context' { runContext :: forall f. 'Functor' f => (a -> f b) -> f t }@,
--- and to @exists s. (s, 'Optics.Lens.Lens' s t a b)@.
+-- and to @exists s. (s, 'Silica.Lens.Lens' s t a b)@.
 --
--- A 'Context' is like a 'Optics.Lens.Lens' that has already been applied to a some structure.
+-- A 'Context' is like a 'Silica.Lens.Lens' that has already been applied to a some structure.
 data Context a b t = Context (b -> t) a
 -- type role Context representational representational representational
 
@@ -282,10 +282,10 @@ instance Corepresentable p => Sellable p (Pretext p) where
 -- 'Profunctor'.
 --
 -- The extra phantom 'Functor' is used to let us lie and claim
--- 'Optics.Getter.Getter'-compatibility under limited circumstances.
+-- 'Silica.Getter.Getter'-compatibility under limited circumstances.
 -- This is used internally to permit a number of combinators to gracefully
--- degrade when applied to a 'Optics.Fold.Fold' or
--- 'Optics.Getter.Getter'.
+-- degrade when applied to a 'Silica.Fold.Fold' or
+-- 'Silica.Getter.Getter'.
 newtype PretextT p (g :: * -> *) a b t = PretextT { runPretextT :: forall f. Functor f => p a (f b) -> f t }
 
 #if __GLASGOW_HASKELL__ >= 707

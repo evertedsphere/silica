@@ -9,7 +9,7 @@
 
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Optics.Internal.Deque
+-- Module      :  Silica.Internal.Deque
 -- Copyright   :  (C) 2012-16 Edward Kmett
 -- License     :  BSD-style (see the file LICENSE)
 -- Maintainer  :  Edward Kmett <ekmett@gmail.com>
@@ -18,7 +18,7 @@
 --
 -- This module is designed to be imported qualified.
 -----------------------------------------------------------------------------
-module Optics.Internal.Deque
+module Silica.Internal.Deque
   ( Deque(..)
   , size
   , fromList
@@ -27,12 +27,12 @@ module Optics.Internal.Deque
   ) where
 
 import Control.Applicative
-import Optics.Cons
-import Optics.Fold
-import Optics.Indexed hiding ((<.>))
-import Optics.Iso
-import Optics.Lens
-import Optics.Prism
+import Silica.Cons
+import Silica.Fold
+import Silica.Indexed hiding ((<.>))
+import Silica.Iso
+import Silica.Lens
+import Silica.Prism
 import Control.Monad
 #if MIN_VERSION_base(4,8,0)
 import Data.Foldable hiding (null)

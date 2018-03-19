@@ -9,7 +9,7 @@
 
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Optics.Internal.FieldTH
+-- Module      :  Silica.Internal.FieldTH
 -- Copyright   :  (C) 2014-2016 Edward Kmett, (C) 2014 Eric Mertens
 -- License     :  BSD-style (see the file LICENSE)
 -- Maintainer  :  Edward Kmett <ekmett@gmail.com>
@@ -18,26 +18,26 @@
 --
 -----------------------------------------------------------------------------
 
-module Optics.Internal.FieldTH
+module Silica.Internal.FieldTH
   ( LensRules(..)
   , FieldNamer
   , DefName(..)
   , ClassyNamer
-  , makeFieldOptics
-  , makeFieldOpticsForDec
-  , makeFieldOpticsForDec'
+  , makeFieldSilica
+  , makeFieldSilicaForDec
+  , makeFieldSilicaForDec'
   , HasFieldClasses
   ) where
 
-import Optics.At
-import Optics.Fold
-import Optics.Internal.TH
-import Optics.Plated
-import Optics.Prism
-import Optics.Setter
-import Optics.Getter
-import Optics.Tuple
-import Optics.Traversal
+import Silica.At
+import Silica.Fold
+import Silica.Internal.TH
+import Silica.Plated
+import Silica.Prism
+import Silica.Setter
+import Silica.Getter
+import Silica.Tuple
+import Silica.Traversal
 import Control.Applicative
 import Control.Monad
 import Control.Monad.State
@@ -62,19 +62,19 @@ import Prelude
 
 -- | Compute the field optics for the type identified by the given type name.
 -- Lenses will be computed when possible, Traversals otherwise.
-makeFieldOptics :: LensRules -> Name -> DecsQ
-makeFieldOptics rules = (`evalStateT` Set.empty) . makeFieldOpticsForDatatype rules <=< D.reifyDatatype
+makeFieldSilica :: LensRules -> Name -> DecsQ
+makeFieldSilica rules = (`evalStateT` Set.empty) . makeFieldSilicaForDatatype rules <=< D.reifyDatatype
 
-makeFieldOpticsForDec :: LensRules -> Dec -> DecsQ
-makeFieldOpticsForDec rules = (`evalStateT` Set.empty) . makeFieldOpticsForDec' rules
+makeFieldSilicaForDec :: LensRules -> Dec -> DecsQ
+makeFieldSilicaForDec rules = (`evalStateT` Set.empty) . makeFieldSilicaForDec' rules
 
-makeFieldOpticsForDec' :: LensRules -> Dec -> HasFieldClasses [Dec]
-makeFieldOpticsForDec' rules = makeFieldOpticsForDatatype rules <=< lift . D.normalizeDec
+makeFieldSilicaForDec' :: LensRules -> Dec -> HasFieldClasses [Dec]
+makeFieldSilicaForDec' rules = makeFieldSilicaForDatatype rules <=< lift . D.normalizeDec
 
 -- | Compute the field optics for a deconstructed datatype Dec
 -- When possible build an Iso otherwise build one optic per field.
-makeFieldOpticsForDatatype :: LensRules -> D.DatatypeInfo -> HasFieldClasses [Dec]
-makeFieldOpticsForDatatype rules info =
+makeFieldSilicaForDatatype :: LensRules -> D.DatatypeInfo -> HasFieldClasses [Dec]
+makeFieldSilicaForDatatype rules info =
   do perDef <- lift $ do
        fieldCons <- traverse normalizeConstructor cons
        let allFields  = toListOf (folded . _2 . folded . _1 . folded) fieldCons

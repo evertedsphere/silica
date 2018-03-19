@@ -20,7 +20,7 @@
 #endif
 -------------------------------------------------------------------------------
 -- |
--- Module      :  Optics.Type
+-- Module      :  Silica.Type
 -- Copyright   :  (C) 2012-16 Edward Kmett
 -- License     :  BSD-style (see the file LICENSE)
 -- Maintainer  :  Edward Kmett <ekmett@gmail.com>
@@ -31,7 +31,7 @@
 -- signatures or in documentation when talking about lenses. The remaining types
 -- for consuming lenses are distributed across various modules in the hierarchy.
 -------------------------------------------------------------------------------
-module Optics.Type where
+module Silica.Type where
 
   -- (
   -- -- * Other
@@ -101,8 +101,8 @@ module Optics.Type where
   -- ) where
 
 import Control.Applicative
-import Optics.Internal.Setter
-import Optics.Internal.Indexed
+import Silica.Internal.Setter
+import Silica.Internal.Indexed
 import Data.Bifunctor
 import Data.Functor.Identity
 import Data.Functor.Contravariant
@@ -121,7 +121,7 @@ import GHC.TypeLits hiding (type (*))
 
 -- $setup
 -- >>> :set -XNoR_OverloadedStrings
--- >>> import Optics
+-- >>> import Silica
 -- >>> import Debug.SimpleReflect.Expr
 -- >>> import Debug.SimpleReflect.Vars as Vars hiding (f,g,h)
 -- >>> import Prelude
@@ -589,7 +589,7 @@ type R_IndexPreservingFold1 s a = forall p f. (Conjoined p, Contravariant f, App
 type Simple f s a = f s s a a
 
 -------------------------------------------------------------------------------
--- R_Optics
+-- R_Silica
 -------------------------------------------------------------------------------
 
 -- | A valid 'R_Optic' @l@ should satisfy the laws:

@@ -10,7 +10,7 @@
 #endif
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Optics.Setter
+-- Module      :  Silica.Setter
 -- Copyright   :  (C) 2012-16 Edward Kmett
 -- License     :  BSD-style (see the file LICENSE)
 -- Maintainer  :  Edward Kmett <ekmett@gmail.com>
@@ -31,7 +31,7 @@
 -- Everything you can do with a 'Functor', you can do with a 'Setter'. There
 -- are combinators that generalize 'fmap' and ('<$').
 ----------------------------------------------------------------------------
-module Optics.Setter
+module Silica.Setter
   (
   -- * Setters
     R_Setter, R_Setter'
@@ -81,9 +81,9 @@ module Optics.Setter
 import Control.Applicative
 import Control.Arrow
 import Control.Comonad
-import Optics.Internal.Indexed
-import Optics.Internal.Setter
-import Optics.Type
+import Silica.Internal.Indexed
+import Silica.Internal.Setter
+import Silica.Type
 import Control.Monad (liftM)
 import Control.Monad.State.Class as State
 import Control.Monad.Writer.Class as Writer
@@ -102,7 +102,7 @@ import Prelude
 #endif
 
 -- $setup
--- >>> import Optics
+-- >>> import Silica
 -- >>> import Control.Monad.State
 -- >>> import Data.Char
 -- >>> import Data.Map as Map

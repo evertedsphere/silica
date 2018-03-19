@@ -4,7 +4,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Optics.Internal.Getter
+-- Module      :  Silica.Internal.Getter
 -- Copyright   :  (C) 2012-2016 Edward Kmett
 -- License     :  BSD-style (see the file LICENSE)
 -- Maintainer  :  Edward Kmett <ekmett@gmail.com>
@@ -12,7 +12,7 @@
 -- Portability :  non-portable
 --
 ----------------------------------------------------------------------------
-module Optics.Internal.Getter
+module Silica.Internal.Getter
   ( noEffect
   , AlongsideLeft(..)
   , AlongsideRight(..)

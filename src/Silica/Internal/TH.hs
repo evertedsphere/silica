@@ -23,7 +23,7 @@
 #endif
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Optics.Internal.TH
+-- Module      :  Silica.Internal.TH
 -- Copyright   :  (C) 2013-2016 Edward Kmett and Eric Mertens
 -- License     :  BSD-style (see the file LICENSE)
 -- Maintainer  :  Edward Kmett <ekmett@gmail.com>
@@ -31,7 +31,7 @@
 -- Portability :  non-portable
 --
 ----------------------------------------------------------------------------
-module Optics.Internal.TH where
+module Silica.Internal.TH where
 
 import Data.Functor.Contravariant
 import Language.Haskell.TH
@@ -116,61 +116,61 @@ mkLensName_v           :: String -> String -> Name
 mkLensName_v            = mkNameG_v lensPackageKey
 
 traversalTypeName      :: Name
-traversalTypeName       = mkLensName_tc "Optics.Type" "Traversal"
+traversalTypeName       = mkLensName_tc "Silica.Type" "Traversal"
 
 traversal'TypeName     :: Name
-traversal'TypeName      = mkLensName_tc "Optics.Type" "Traversal'"
+traversal'TypeName      = mkLensName_tc "Silica.Type" "Traversal'"
 
 lensTypeName           :: Name
-lensTypeName            = mkLensName_tc "Optics.Type" "Lens"
+lensTypeName            = mkLensName_tc "Silica.Type" "Lens"
 
 lens'TypeName          :: Name
-lens'TypeName           = mkLensName_tc "Optics.Type" "Lens'"
+lens'TypeName           = mkLensName_tc "Silica.Type" "Lens'"
 
 isoTypeName            :: Name
-isoTypeName             = mkLensName_tc "Optics.Type" "Iso"
+isoTypeName             = mkLensName_tc "Silica.Type" "Iso"
 
 iso'TypeName           :: Name
-iso'TypeName            = mkLensName_tc "Optics.Type" "Iso'"
+iso'TypeName            = mkLensName_tc "Silica.Type" "Iso'"
 
 getterTypeName         :: Name
-getterTypeName          = mkLensName_tc "Optics.Type" "Getter"
+getterTypeName          = mkLensName_tc "Silica.Type" "Getter"
 
 foldTypeName           :: Name
-foldTypeName            = mkLensName_tc "Optics.Type" "Fold"
+foldTypeName            = mkLensName_tc "Silica.Type" "Fold"
 
 prismTypeName          :: Name
-prismTypeName           = mkLensName_tc "Optics.Type" "Prism"
+prismTypeName           = mkLensName_tc "Silica.Type" "Prism"
 
 prism'TypeName         :: Name
-prism'TypeName          = mkLensName_tc "Optics.Type" "Prism'"
+prism'TypeName          = mkLensName_tc "Silica.Type" "Prism'"
 
 reviewTypeName          :: Name
-reviewTypeName           = mkLensName_tc "Optics.Type" "Review"
+reviewTypeName           = mkLensName_tc "Silica.Type" "Review"
 
 wrappedTypeName         :: Name
-wrappedTypeName          = mkLensName_tc "Optics.Wrapped" "Wrapped"
+wrappedTypeName          = mkLensName_tc "Silica.Wrapped" "Wrapped"
 
 unwrappedTypeName       :: Name
-unwrappedTypeName        = mkLensName_tc "Optics.Wrapped" "Unwrapped"
+unwrappedTypeName        = mkLensName_tc "Silica.Wrapped" "Unwrapped"
 
 rewrappedTypeName       :: Name
-rewrappedTypeName        = mkLensName_tc "Optics.Wrapped" "Rewrapped"
+rewrappedTypeName        = mkLensName_tc "Silica.Wrapped" "Rewrapped"
 
 _wrapped'ValName        :: Name
-_wrapped'ValName         = mkLensName_v "Optics.Wrapped" "_Wrapped'"
+_wrapped'ValName         = mkLensName_v "Silica.Wrapped" "_Wrapped'"
 
 isoValName              :: Name
-isoValName               = mkLensName_v "Optics.Iso" "iso"
+isoValName               = mkLensName_v "Silica.Iso" "iso"
 
 prismValName            :: Name
-prismValName             = mkLensName_v "Optics.Prism" "prism"
+prismValName             = mkLensName_v "Silica.Prism" "prism"
 
 untoValName             :: Name
-untoValName              = mkLensName_v "Optics.Review" "unto"
+untoValName              = mkLensName_v "Silica.Review" "unto"
 
 phantomValName          :: Name
-phantomValName           = mkLensName_v "Optics.Internal.TH" "phantom2"
+phantomValName           = mkLensName_v "Silica.Internal.TH" "phantom2"
 
 phantom2 :: (Functor f, Contravariant f) => f a -> f b
 phantom2 = phantom

@@ -1,7 +1,7 @@
 {-# LANGUAGE CPP #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Optics.Internal.Prism
+-- Module      :  Silica.Internal.Prism
 -- Copyright   :  (C) 2012-2016 Edward Kmett
 -- License     :  BSD-style (see the file LICENSE)
 -- Maintainer  :  Edward Kmett <ekmett@gmail.com>
@@ -9,7 +9,7 @@
 -- Portability :  non-portable
 --
 ----------------------------------------------------------------------------
-module Optics.Internal.Prism
+module Silica.Internal.Prism
   ( Market(..)
   , Market'
   ) where
@@ -17,14 +17,14 @@ module Optics.Internal.Prism
 import Data.Profunctor
 #ifndef SAFE
 import Data.Profunctor.Unsafe
-import Optics.Internal.Coerce
+import Silica.Internal.Coerce
 #endif
 
 ------------------------------------------------------------------------------
 -- Prism: Market
 ------------------------------------------------------------------------------
 
--- | This type is used internally by the 'Optics.Prism.Prism' code to
+-- | This type is used internally by the 'Silica.Prism.Prism' code to
 -- provide efficient access to the two parts of a 'Prism'.
 data Market a b s t = Market (b -> t) (s -> Either t a)
 

@@ -22,7 +22,7 @@
 #endif
 -------------------------------------------------------------------------------
 -- |
--- Module      :  Optics.Lens
+-- Module      :  Silica.Lens
 -- Copyright   :  (C) 2012-16 Edward Kmett
 -- License     :  BSD-style (see the file LICENSE)
 -- Maintainer  :  Edward Kmett <ekmett@gmail.com>
@@ -65,7 +65,7 @@
 -- In the examples below, 'getter' and 'setter' are supplied as example getters
 -- and setters, and are not actual functions supplied by this package.
 -------------------------------------------------------------------------------
-module Optics.Lens 
+module Silica.Lens 
   (
   -- * Lenses
     Lens, Lens'
@@ -138,10 +138,10 @@ module Optics.Lens
 import Control.Applicative
 import Control.Arrow
 import Control.Comonad
-import Optics.Internal.Context
-import Optics.Internal.Getter
-import Optics.Internal.Indexed
-import Optics.Type
+import Silica.Internal.Context
+import Silica.Internal.Getter
+import Silica.Internal.Indexed
+import Silica.Type
 import Control.Monad.State as State
 import Data.Functor.Yoneda
 import Data.Monoid
@@ -167,7 +167,7 @@ import GHC.Exts (Constraint)
 
 -- $setup
 -- >>> :set -XNoOverloadedStrings
--- >>> import Optics
+-- >>> import Silica
 -- >>> import Control.Monad.State
 -- >>> import Data.Char (chr)
 -- >>> import Debug.SimpleReflect.Expr

@@ -12,7 +12,7 @@
 #endif
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Optics.Internal.Magma
+-- Module      :  Silica.Internal.Magma
 -- Copyright   :  (C) 2012-2016 Edward Kmett
 -- License     :  BSD-style (see the file LICENSE)
 -- Maintainer  :  Edward Kmett <ekmett@gmail.com>
@@ -20,7 +20,7 @@
 -- Portability :  non-portable
 --
 ----------------------------------------------------------------------------
-module Optics.Internal.Magma
+module Silica.Internal.Magma
   (
   -- * Magma
     Magma(..)
@@ -38,9 +38,9 @@ module Optics.Internal.Magma
 import Control.Applicative
 import Control.Category
 import Control.Comonad
-import Optics.Internal.Bazaar
-import Optics.Internal.Context
-import Optics.Internal.Indexed
+import Silica.Internal.Bazaar
+import Silica.Internal.Context
+import Silica.Internal.Indexed
 import Data.Foldable
 import Data.Functor.Apply
 import Data.Functor.Contravariant
@@ -56,7 +56,7 @@ import Prelude hiding ((.),id)
 ------------------------------------------------------------------------------
 
 -- | This provides a way to peek at the internal structure of a
--- 'Optics.Traversal.Traversal' or 'Optics.Traversal.IndexedTraversal'
+-- 'Silica.Traversal.Traversal' or 'Silica.Traversal.IndexedTraversal'
 data Magma i t b a where
   MagmaAp   :: Magma i (x -> y) b a -> Magma i x b a -> Magma i y b a
   MagmaPure :: x -> Magma i x b a

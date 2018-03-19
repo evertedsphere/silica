@@ -13,7 +13,7 @@
 
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Optics.Internal.Bazaar
+-- Module      :  Silica.Internal.Bazaar
 -- Copyright   :  (C) 2012-2016 Edward Kmett
 -- License     :  BSD-style (see the file LICENSE)
 -- Maintainer  :  Edward Kmett <ekmett@gmail.com>
@@ -21,7 +21,7 @@
 -- Portability :  non-portable
 --
 ----------------------------------------------------------------------------
-module Optics.Internal.Bazaar
+module Silica.Internal.Bazaar
   ( Bizarre(..)
   , Bazaar(..), Bazaar'
   , BazaarT(..), BazaarT'
@@ -34,8 +34,8 @@ import Control.Applicative
 import Control.Arrow as Arrow
 import Control.Category
 import Control.Comonad
-import Optics.Internal.Context
-import Optics.Internal.Indexed
+import Silica.Internal.Context
+import Silica.Internal.Indexed
 import Data.Functor.Apply
 import Data.Functor.Compose
 import Data.Functor.Contravariant
@@ -60,13 +60,13 @@ class Profunctor p => Bizarre p w | w -> p where
 -- Bazaar
 ------------------------------------------------------------------------------
 
--- | This is used to characterize a 'Optics.Traversal.Traversal'.
+-- | This is used to characterize a 'Silica.Traversal.Traversal'.
 --
 -- a.k.a. indexed Cartesian store comonad, indexed Kleene store comonad, or an indexed 'FunList'.
 --
 -- <http://twanvl.nl/blog/haskell/non-regular1>
 --
--- A 'Bazaar' is like a 'Optics.Traversal.Traversal' that has already been applied to some structure.
+-- A 'Bazaar' is like a 'Silica.Traversal.Traversal' that has already been applied to some structure.
 --
 -- Where a @'Context' a b t@ holds an @a@ and a function from @b@ to
 -- @t@, a @'Bazaar' a b t@ holds @N@ @a@s and a function from @N@
@@ -134,7 +134,7 @@ instance (a ~ b, Conjoined p) => ComonadApply (Bazaar p a b) where
 -- | 'BazaarT' is like 'Bazaar', except that it provides a questionable 'Contravariant' instance
 -- To protect this instance it relies on the soundness of another 'Contravariant' type, and usage conventions.
 --
--- For example. This lets us write a suitably polymorphic and lazy 'Optics.Traversal.taking', but there
+-- For example. This lets us write a suitably polymorphic and lazy 'Silica.Traversal.taking', but there
 -- must be a better way!
 newtype BazaarT p (g :: * -> *) a b t = BazaarT { runBazaarT :: forall f. Applicative f => p a (f b) -> f t }
 #if __GLASGOW_HASKELL__ >= 707
@@ -216,13 +216,13 @@ class Profunctor p => Bizarre1 p w | w -> p where
 -- Bazaar1
 ------------------------------------------------------------------------------
 
--- | This is used to characterize a 'Optics.Traversal.Traversal'.
+-- | This is used to characterize a 'Silica.Traversal.Traversal'.
 --
 -- a.k.a. indexed Cartesian store comonad, indexed Kleene store comonad, or an indexed 'FunList'.
 --
 -- <http://twanvl.nl/blog/haskell/non-regular1>
 --
--- A 'Bazaar1' is like a 'Optics.Traversal.Traversal' that has already been applied to some structure.
+-- A 'Bazaar1' is like a 'Silica.Traversal.Traversal' that has already been applied to some structure.
 --
 -- Where a @'Context' a b t@ holds an @a@ and a function from @b@ to
 -- @t@, a @'Bazaar1' a b t@ holds @N@ @a@s and a function from @N@
@@ -284,7 +284,7 @@ instance (a ~ b, Conjoined p) => ComonadApply (Bazaar1 p a b) where
 -- | 'BazaarT1' is like 'Bazaar1', except that it provides a questionable 'Contravariant' instance
 -- To protect this instance it relies on the soundness of another 'Contravariant' type, and usage conventions.
 --
--- For example. This lets us write a suitably polymorphic and lazy 'Optics.Traversal.taking', but there
+-- For example. This lets us write a suitably polymorphic and lazy 'Silica.Traversal.taking', but there
 -- must be a better way!
 newtype BazaarT1 p (g :: * -> *) a b t = BazaarT1 { runBazaarT1 :: forall f. Apply f => p a (f b) -> f t }
 #if __GLASGOW_HASKELL__ >= 707

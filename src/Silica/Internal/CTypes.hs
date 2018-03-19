@@ -1,13 +1,13 @@
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Optics.Internal.CTypes
+-- Module      :  Silica.Internal.CTypes
 -- Copyright   :  (C) 2012-2016 Edward Kmett, (C) 2017 Ryan Scott
 -- License     :  BSD-style (see the file LICENSE)
 -- Maintainer  :  Edward Kmett <ekmett@gmail.com>
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- In "Optics.Wrapped", we need to muck around with the internals of the
+-- In "Silica.Wrapped", we need to muck around with the internals of the
 -- newtypes in "Foreign.C.Types". Unfortunately, the exact types used varies
 -- wildly from platform to platform, so trying to manage the imports necessary
 -- to bring these types in scope can be unwieldy.
@@ -17,7 +17,7 @@
 -- now, this consists of all the exports from the "Data.Int" and "Data.Word"
 -- modules, as well as the 'Ptr' type.
 ----------------------------------------------------------------------------
-module Optics.Internal.CTypes
+module Silica.Internal.CTypes
   ( module Data.Int
   , Ptr
   , module Data.Word

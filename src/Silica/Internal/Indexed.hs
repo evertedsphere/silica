@@ -12,7 +12,7 @@
 
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Optics.Internal.Indexed
+-- Module      :  Silica.Internal.Indexed
 -- Copyright   :  (C) 2012-2016 Edward Kmett
 -- License     :  BSD-style (see the file LICENSE)
 -- Maintainer  :  Edward Kmett <ekmett@gmail.com>
@@ -21,7 +21,7 @@
 --
 -- Internal implementation details for 'Indexed' lens-likes
 ----------------------------------------------------------------------------
-module Optics.Internal.Indexed
+module Silica.Internal.Indexed
   (
   -- * An Indexed Profunctor
     Indexed(..)
@@ -43,7 +43,7 @@ import Control.Applicative
 import Control.Arrow as Arrow
 import Control.Category
 import Control.Comonad
-import Optics.Internal.Instances ()
+import Silica.Internal.Instances ()
 import Control.Monad
 import Control.Monad.Fix
 import Data.Distributive
@@ -60,12 +60,12 @@ import Data.Traversable
 import Prelude hiding ((.),id)
 #ifndef SAFE
 import Data.Profunctor.Unsafe
-import Optics.Internal.Coerce
+import Silica.Internal.Coerce
 #endif
 
 -- $setup
 -- >>> :set -XNoOverloadedStrings
--- >>> import Optics
+-- >>> import Silica
 -- >>> import Numeric.Lens
 --
 ------------------------------------------------------------------------------
@@ -251,7 +251,7 @@ instance i ~ j => Indexable i (Indexed j) where
 ------------------------------------------------------------------------------
 
 -- | 'Applicative' composition of @'Control.Monad.Trans.State.Lazy.State' 'Int'@ with a 'Functor', used
--- by 'Optics.Indexed.indexed'.
+-- by 'Silica.Indexed.indexed'.
 newtype Indexing f a = Indexing { runIndexing :: Int -> (Int, f a) }
 
 instance Functor f => Functor (Indexing f) where
@@ -300,19 +300,19 @@ instance Monoid (f a) => Monoid (Indexing f a) where
          ~(k, y) -> (k, mappend x y)
     {-# INLINE mappend #-}
 
--- | Transform a 'Optics.Traversal.Traversal' into an 'Optics.Traversal.IndexedTraversal' or
--- a 'Optics.Fold.Fold' into an 'Optics.Fold.IndexedFold', etc.
+-- | Transform a 'Silica.Traversal.Traversal' into an 'Silica.Traversal.IndexedTraversal' or
+-- a 'Silica.Fold.Fold' into an 'Silica.Fold.IndexedFold', etc.
 --
 -- @
--- 'indexing' :: 'Optics.Type.Traversal' s t a b -> 'Optics.Type.IndexedTraversal' 'Int' s t a b
--- 'indexing' :: 'Optics.Type.Prism' s t a b     -> 'Optics.Type.IndexedTraversal' 'Int' s t a b
--- 'indexing' :: 'Optics.Type.Lens' s t a b      -> 'Optics.Type.IndexedLens' 'Int'  s t a b
--- 'indexing' :: 'Optics.Type.Iso' s t a b       -> 'Optics.Type.IndexedLens' 'Int' s t a b
--- 'indexing' :: 'Optics.Type.Fold' s a          -> 'Optics.Type.IndexedFold' 'Int' s a
--- 'indexing' :: 'Optics.Type.Getter' s a        -> 'Optics.Type.IndexedGetter' 'Int' s a
+-- 'indexing' :: 'Silica.Type.Traversal' s t a b -> 'Silica.Type.IndexedTraversal' 'Int' s t a b
+-- 'indexing' :: 'Silica.Type.Prism' s t a b     -> 'Silica.Type.IndexedTraversal' 'Int' s t a b
+-- 'indexing' :: 'Silica.Type.Lens' s t a b      -> 'Silica.Type.IndexedLens' 'Int'  s t a b
+-- 'indexing' :: 'Silica.Type.Iso' s t a b       -> 'Silica.Type.IndexedLens' 'Int' s t a b
+-- 'indexing' :: 'Silica.Type.Fold' s a          -> 'Silica.Type.IndexedFold' 'Int' s a
+-- 'indexing' :: 'Silica.Type.Getter' s a        -> 'Silica.Type.IndexedGetter' 'Int' s a
 -- @
 --
--- @'indexing' :: 'Indexable' 'Int' p => 'Optics.Type.LensLike' ('Indexing' f) s t a b -> 'Optics.Type.Over' p f s t a b@
+-- @'indexing' :: 'Indexable' 'Int' p => 'Silica.Type.LensLike' ('Indexing' f) s t a b -> 'Silica.Type.Over' p f s t a b@
 indexing :: Indexable Int p => ((a -> Indexing f b) -> s -> Indexing f t) -> p a (f b) -> s -> f t
 indexing l iafb s = snd $ runIndexing (l (\a -> Indexing (\i -> i `seq` (i + 1, indexed iafb i a))) s) 0
 {-# INLINE indexing #-}
@@ -322,7 +322,7 @@ indexing l iafb s = snd $ runIndexing (l (\a -> Indexing (\i -> i `seq` (i + 1, 
 ------------------------------------------------------------------------------
 
 -- | 'Applicative' composition of @'Control.Monad.Trans.State.Lazy.State' 'Int64'@ with a 'Functor', used
--- by 'Optics.Indexed.indexed64'.
+-- by 'Silica.Indexed.indexed64'.
 newtype Indexing64 f a = Indexing64 { runIndexing64 :: Int64 -> (Int64, f a) }
 
 instance Functor f => Functor (Indexing64 f) where
@@ -349,21 +349,21 @@ instance Contravariant f => Contravariant (Indexing64 f) where
     (j, ff) -> (j, contramap f ff)
   {-# INLINE contramap #-}
 
--- | Transform a 'Optics.Traversal.Traversal' into an 'Optics.Traversal.IndexedTraversal' or
--- a 'Optics.Fold.Fold' into an 'Optics.Fold.IndexedFold', etc.
+-- | Transform a 'Silica.Traversal.Traversal' into an 'Silica.Traversal.IndexedTraversal' or
+-- a 'Silica.Fold.Fold' into an 'Silica.Fold.IndexedFold', etc.
 --
 -- This combinator is like 'indexing' except that it handles large traversals and folds gracefully.
 --
 -- @
--- 'indexing64' :: 'Optics.Type.Traversal' s t a b -> 'Optics.Type.IndexedTraversal' 'Int64' s t a b
--- 'indexing64' :: 'Optics.Type.Prism' s t a b     -> 'Optics.Type.IndexedTraversal' 'Int64' s t a b
--- 'indexing64' :: 'Optics.Type.Lens' s t a b      -> 'Optics.Type.IndexedLens' 'Int64' s t a b
--- 'indexing64' :: 'Optics.Type.Iso' s t a b       -> 'Optics.Type.IndexedLens' 'Int64' s t a b
--- 'indexing64' :: 'Optics.Type.Fold' s a          -> 'Optics.Type.IndexedFold' 'Int64' s a
--- 'indexing64' :: 'Optics.Type.Getter' s a        -> 'Optics.Type.IndexedGetter' 'Int64' s a
+-- 'indexing64' :: 'Silica.Type.Traversal' s t a b -> 'Silica.Type.IndexedTraversal' 'Int64' s t a b
+-- 'indexing64' :: 'Silica.Type.Prism' s t a b     -> 'Silica.Type.IndexedTraversal' 'Int64' s t a b
+-- 'indexing64' :: 'Silica.Type.Lens' s t a b      -> 'Silica.Type.IndexedLens' 'Int64' s t a b
+-- 'indexing64' :: 'Silica.Type.Iso' s t a b       -> 'Silica.Type.IndexedLens' 'Int64' s t a b
+-- 'indexing64' :: 'Silica.Type.Fold' s a          -> 'Silica.Type.IndexedFold' 'Int64' s a
+-- 'indexing64' :: 'Silica.Type.Getter' s a        -> 'Silica.Type.IndexedGetter' 'Int64' s a
 -- @
 --
--- @'indexing64' :: 'Indexable' 'Int64' p => 'Optics.Type.LensLike' ('Indexing64' f) s t a b -> 'Optics.Type.Over' p f s t a b@
+-- @'indexing64' :: 'Indexable' 'Int64' p => 'Silica.Type.LensLike' ('Indexing64' f) s t a b -> 'Silica.Type.Over' p f s t a b@
 indexing64 :: Indexable Int64 p => ((a -> Indexing64 f b) -> s -> Indexing64 f t) -> p a (f b) -> s -> f t
 indexing64 l iafb s = snd $ runIndexing64 (l (\a -> Indexing64 (\i -> i `seq` (i + 1, indexed iafb i a))) s) 0
 {-# INLINE indexing64 #-}
