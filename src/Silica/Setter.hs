@@ -190,10 +190,6 @@ type Setting' p s a = Setting p s s a a
 -- >>> over (mapped._2) length [("hello","world"),("leaders","!!!")]
 -- [("hello",5),("leaders",3)]
 --
--- @
--- 'mapped' :: 'Functor' f => 'Setter' (f a) (f b) a b
--- @
---
 -- If you want an 'IndexPreservingSetter' use @'setting' 'fmap'@.
 mapped :: Functor f => Setter (f a) (f b) a b
 mapped = sets fmap
@@ -291,15 +287,16 @@ setting :: ((a -> b) -> s -> t) -> R_IndexPreservingSetter s t a b
 setting l pafb = cotabulate $ \ws -> pure $ l (\a -> untainted (cosieve pafb (a <$ ws))) (extract ws)
 {-# INLINE setting #-}
 
--- | Build a 'Setter', 'IndexedSetter' or 'IndexPreservingSetter' depending on your choice of 'Profunctor'.
+-- | Build a 'R_Setter', 'R_IndexedSetter' or 'R_IndexPreservingSetter' depending on your choice of 'Profunctor'.
 --
 -- @
--- 'sets' :: ((a -> b) -> s -> t) -> 'Setter' s t a b
+-- 'gsets' :: ((a -> b) -> s -> t) -> 'R_Setter' s t a b
 -- @
 gsets :: (Profunctor p, Profunctor q, Settable f) => (p a b -> q s t) -> R_Optical p q f s t a b
 gsets f g = taintedDot (f (untaintedDot g))
 {-# INLINE gsets #-}
 
+-- | Build a 'Setter'.
 sets :: ((a -> b) -> s -> t) -> Setter s t a b
 sets f = Optic (gsets f)
 {-# INLINE sets #-}

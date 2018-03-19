@@ -510,12 +510,13 @@ chosen pafb = cotabulate $ \weaa -> cosieve (either id id `lmap` pafb) weaa <&> 
 -- 'alongside' :: 'Lens'   s t a b -> 'Lens'   s' t' a' b' -> 'Lens'   (s,s') (t,t') (a,a') (b,b')
 -- 'alongside' :: 'Getter' s t a b -> 'Getter' s' t' a' b' -> 'Getter' (s,s') (t,t') (a,a') (b,b')
 -- @
-alongside :: LensLike (AlongsideLeft f b') s  t  a  b
-          -> LensLike (AlongsideRight f t) s' t' a' b'
+alongside :: (AsLensLike (AlongsideLeft f b') k, AsLensLike (AlongsideRight f t) l)
+          => Optic k s t a b
+          -> Optic l s' t' a' b'
           -> LensLike f (s, s') (t, t') (a, a') (b, b')
 alongside l1 l2 = Optic $ \f (a1, a2) ->
-  getAlongsideRight $ runOptic l2 ?? a2 $ \b2 -> AlongsideRight
-  $ getAlongsideLeft  $ runOptic l1 ?? a1 $ \b1 -> AlongsideLeft
+  getAlongsideRight $ runLensLike l2 ?? a2 $ \b2 -> AlongsideRight
+  $ getAlongsideLeft  $ runLensLike l1 ?? a1 $ \b1 -> AlongsideLeft
   $ f (b1,b2)
 {-# INLINE alongside #-}
 
@@ -1238,13 +1239,10 @@ l <<<>= b = toLensLike l %%= \a -> (a, a `mappend` b)
 -- ('<<~') :: 'MonadState' s m => 'Control.Lens.Iso.Iso' s s a b   -> m b -> m b
 -- ('<<~') :: 'MonadState' s m => 'Lens' s s a b  -> m b -> m b
 -- @
---
--- NB: This is limited to taking an actual 'Lens' than admitting a 'Control.Lens.Traversal.Traversal' because
--- there are potential loss of state issues otherwise.
-(<<~) :: (MonadState s m, AsLens k) => Optic k s s a b -> m b -> m b
+(<<~) :: forall s a b m k. (MonadState s m, AsLens k) => Optic k s s a b -> m b -> m b
 l <<~ mb = do
   b <- mb
-  modify $ \s -> ipeek b (runOptic (toALens (toLens l)) sell s)
+  modify $ \s -> ipeek b (runOptic (toLensLike (toLens l) :: ALens s s a b) sell s)
   return b
 {-# INLINE (<<~) #-}
 
@@ -1389,103 +1387,6 @@ l <%@= f = l %%@= \ i a -> let b = f i a in (b, b)
 l <<%@= f = State.state (runOptic (toIndexedLensLike l) (Indexed $ \ i a -> (a, f i a)))
 {-# INLINE (<<%@=) #-}
 
-{-
-------------------------------------------------------------------------------
--- ALens Combinators
-------------------------------------------------------------------------------
-
--- | A version of ('Control.Lens.Getter.^.') that works on 'ALens'.
---
--- >>> ("hello","world")^#_2
--- "world"
-(^#) :: s -> ALens s t a b -> a
-s ^# l = ipos (runOptic l sell s)
-{-# INLINE (^#) #-}
-
--- | A version of 'Control.Lens.Setter.set' that works on 'ALens'.
---
--- >>> storing _2 "world" ("hello","there")
--- ("hello","world")
-storing :: ALens s t a b -> b -> s -> t
-storing l b s = ipeek b (runOptic l sell s)
-{-# INLINE storing #-}
-
--- | A version of ('Control.Lens.Setter..~') that works on 'ALens'.
---
--- >>> ("hello","there") & _2 #~ "world"
--- ("hello","world")
-(#~) :: ALens s t a b -> b -> s -> t
-(#~) l b s = ipeek b (runOptic l sell s)
-{-# INLINE (#~) #-}
-
--- | A version of ('Control.Lens.Setter.%~') that works on 'ALens'.
---
--- >>> ("hello","world") & _2 #%~ length
--- ("hello",5)
-(#%~) :: ALens s t a b -> (a -> b) -> s -> t
-(#%~) l f s = ipeeks f (runOptic l sell s)
-{-# INLINE (#%~) #-}
-
--- | A version of ('%%~') that works on 'ALens'.
---
--- >>> ("hello","world") & _2 #%%~ \x -> (length x, x ++ "!")
--- (5,("hello","world!"))
-(#%%~) :: Functor f => ALens s t a b -> (a -> f b) -> s -> f t
-(#%%~) l f s = runPretext (runOptic l sell s) f
-{-# INLINE (#%%~) #-}
-
--- | A version of ('Control.Lens.Setter..=') that works on 'ALens'.
-(#=) :: MonadState s m => ALens s s a b -> b -> m ()
-l #= f = modify (l #~ f)
-{-# INLINE (#=) #-}
-
--- | A version of ('Control.Lens.Setter.%=') that works on 'ALens'.
-(#%=) :: MonadState s m => ALens s s a b -> (a -> b) -> m ()
-l #%= f = modify (l #%~ f)
-{-# INLINE (#%=) #-}
-
--- | A version of ('<%~') that works on 'ALens'.
---
--- >>> ("hello","world") & _2 <#%~ length
--- (5,("hello",5))
-(<#%~) :: ALens s t a b -> (a -> b) -> s -> (b, t)
-l <#%~ f = \s -> runPretext (runOptic l sell s) $ \a -> let b = f a in (b, b)
-{-# INLINE (<#%~) #-}
-
--- | A version of ('<%=') that works on 'ALens'.
-(<#%=) :: MonadState s m => ALens s s a b -> (a -> b) -> m b
-l <#%= f = l #%%= \a -> let b = f a in (b, b)
-{-# INLINE (<#%=) #-}
-
--- | A version of ('%%=') that works on 'ALens'.
-(#%%=) :: MonadState s m => ALens s s a b -> (a -> (r, b)) -> m r
-#if MIN_VERSION_mtl(2,1,1)
-l #%%= f = State.state $ \s -> runPretext (runOptic l sell s) f
-#else
-l #%%= f = do
-  p <- State.gets (runOptic l sell)
-  let (r, t) = runPretext p f
-  State.put t
-  return r
-#endif
-{-# INLINE (#%%=) #-}
-
--- | A version of ('Control.Lens.Setter.<.~') that works on 'ALens'.
---
--- >>> ("hello","there") & _2 <#~ "world"
--- ("world",("hello","world"))
-(<#~) :: ALens s t a b -> b -> s -> (b, t)
-l <#~ b = \s -> (b, storing l b s)
-{-# INLINE (<#~) #-}
-
--- | A version of ('Control.Lens.Setter.<.=') that works on 'ALens'.
-(<#=) :: MonadState s m => ALens s s a b -> b -> m b
-l <#= b = do
-  l #= b
-  return b
-{-# INLINE (<#=) #-}
--}
-
 -- | There is a field for every type in the 'Void'. Very zen.
 --
 -- >>> [] & mapped.devoid +~ 1
@@ -1534,3 +1435,18 @@ united = Optic (\f v -> f () <&> \() -> v)
 fusing :: Functor f => LensLike (Yoneda f) s t a b -> LensLike f s t a b
 fusing t = Optic (\f -> lowerYoneda . runOptic t (liftYoneda . f))
 {-# INLINE fusing #-}
+
+--------------------------------------------------------------------------------
+  -- Odds and ends
+--------------------------------------------------------------------------------
+
+-- The "original" form of (<<~). Unsure if this provides any benefits over the Lens-restricted version.
+-- NB: This is limited to taking an actual 'Lens' than admitting a 'Control.Lens.Traversal.Traversal' because
+-- there are potential loss of state issues otherwise.
+--
+-- (<<~!) :: forall s a b m k. (MonadState s m, AsLensLike (Pretext (->) a b) k) => Optic k s s a b -> m b -> m b
+-- l <<~! mb = do
+--   b <- mb
+--   modify $ \s -> ipeek b (runOptic (toLensLike l :: ALens s s a b) sell s)
+--   return b
+-- {-# INLINE (<<~!) #-}

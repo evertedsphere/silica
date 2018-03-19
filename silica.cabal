@@ -17,6 +17,7 @@ cabal-version:       >=1.10
 
 library
   exposed-modules:     Silica
+                     , Silica.Essentials
                      , Silica.Internal.Coerce
                      , Silica.Internal.Context
                      , Silica.Internal.Getter
