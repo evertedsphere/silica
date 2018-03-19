@@ -70,11 +70,6 @@ module Silica.Lens
   -- * Lenses
     Lens, Lens'
   , IndexedLens, IndexedLens'
-  -- ** Concrete Lenses
-  , R_ALens, R_ALens'
-  , R_AnIndexedLens, R_AnIndexedLens'
-  , ALens, ALens'
-  , AnIndexedLens, AnIndexedLens'
 
   -- * Combinators
   , lens, ilens, iplens
@@ -108,21 +103,10 @@ module Silica.Lens
   , (<<||=), (<<&&=), (<<<>=)
   , (<<~)
 
-  -- * Cloning Lenses
-  -- , cloneLens
-  -- , cloneIndexPreservingLens
-  -- , cloneIndexedLens
-
   -- * Arrow operators
   , overA
 
-  -- * R_ALens Combinators
-  , storing
-  , (^#)
-  , (#~), (#%~), (#%%~), (<#~), (<#%~)
-  , (#=), (#%=), (#%%=), (<#=), (<#%=)
-
-  -- * Common Lenses
+  -- * Uncommon Lenses
   , devoid
   , united
 
@@ -178,14 +162,12 @@ import GHC.Exts (Constraint)
 -- >>> let getter :: Expr -> Expr; getter = fun "getter"
 -- >>> let setter :: Expr -> Expr -> Expr; setter = fun "setter"
 
-infixl 8 ^#
-
 infixr 4 %%@~, <%@~, <<%@~, %%~, <+~, <*~, <-~, <//~, <^~, <^^~, <**~, <&&~
-infixr 4 <||~, <<>~, <%~, <<%~, <<.~, <<?~, <#~, #~, #%~, <#%~, #%%~
+infixr 4 <||~, <<>~, <%~, <<%~, <<.~, <<?~
 infixr 4 <<+~, <<-~, <<*~, <<//~, <<^~, <<^^~, <<**~, <<||~, <<&&~, <<<>~
 
 infix  4 %%@=, <%@=, <<%@=, %%=, <+=, <*=, <-=, <//=, <^=, <^^=, <**=, <&&=
-infix  4 <||=, <<>=, <%=, <<%=, <<.=, <<?=, <#=, #=, #%=, <#%=, #%%=
+infix  4 <||=, <<>=, <%=, <<%=, <<.=, <<?=
 infix  4 <<+=, <<-=, <<*=, <<//=, <<^=, <<^^=, <<**=, <<||=, <<&&=, <<<>=
 
 infixr 2 <<~
@@ -200,24 +182,45 @@ infixl 1 ??, &~
 -- This type can also be used when you need to store a 'Lens' in a container,
 -- since it is rank-1. You can turn them back into a 'Lens' with 'cloneLens',
 -- or use it directly with combinators like 'storing' and ('^#').
-type R_ALens s t a b = R_LensLike (Pretext (->) a b) s t a b
 type ALens s t a b = LensLike (Pretext (->) a b) s t a b
 
 -- | @
--- type 'R_ALens'' = 'Simple' 'R_ALens'
+-- type 'ALens'' = 'Simple' 'ALens'
 -- @
-type R_ALens' s a = R_ALens s s a a
 type ALens' s a = ALens s s a a
 
 -- | When you see this as an argument to a function, it expects an 'IndexedLens'
-type R_AnIndexedLens i s t a b = R_Optical (Indexed i) (->) (Pretext (Indexed i) a b) s t a b
 type AnIndexedLens i s t a b = Optical (Indexed i) (->) (Pretext (Indexed i) a b) s t a b
 
 -- | @
--- type 'R_AnIndexedLens'' = 'Simple' ('R_AnIndexedLens' i)
+-- type 'AnIndexedLens'' = 'Simple' ('AnIndexedLens' i)
 -- @
-type R_AnIndexedLens' i s a  = R_AnIndexedLens i s s a a
 type AnIndexedLens' i s a  = AnIndexedLens i s s a a
+
+toOver :: AsOver p f k => Optic k s t a b -> Over p f s t a b
+toOver = sub
+
+runOver :: AsOver p f k => Optic k s t a b -> R_Over p f s t a b
+runOver = runOptic . toOver
+
+toLensLike :: AsLensLike f k => Optic k s t a b -> LensLike f s t a b
+toLensLike = sub
+
+runLensLike :: AsLensLike f k => Optic k s t a b -> R_LensLike f s t a b
+runLensLike = runOptic . toLensLike
+
+toLensLikePair :: AsLensLike ((,) b) k => Optic k s t a b -> LensLike ((,) b) s t a b
+toLensLikePair = sub
+
+-- | Explicitly cast an optic to a lens.
+toLens :: AsLens o => Optic o s t a b -> Lens s t a b
+toLens = sub
+{-# INLINE toLens #-}
+
+-- | Explicitly cast an optic to a lens.
+toALens :: (o <: A_LensLike (Pretext (->) a b)) => Optic o s t a b -> ALens s t a b
+toALens = sub
+{-# INLINE toALens #-}
 
 --------------------------
 -- Constructing Lenses
@@ -226,7 +229,7 @@ type AnIndexedLens' i s a  = AnIndexedLens i s s a a
 -- | Build a 'Lens' from a getter and a setter.
 --
 -- @
--- 'lens' :: 'Functor' f => (s -> a) -> (s -> b -> t) -> (a -> f b) -> s -> f t
+-- 'lens' :: (s -> a) -> (s -> a -> s) -> 'Lens'' s a
 -- @
 --
 -- >>> s ^. lens getter setter
@@ -238,41 +241,21 @@ type AnIndexedLens' i s a  = AnIndexedLens i s s a a
 -- >>> s & lens getter setter %~ f
 -- setter s (f (getter s))
 --
--- @
--- 'lens' :: (s -> a) -> (s -> a -> s) -> 'Lens'' s a
--- @
-mkLensRaw :: (s -> a) -> (s -> b -> t) -> R_Lens s t a b
-mkLensRaw sa sbt afb s = sbt s <$> afb (sa s)
-{-# INLINE mkLensRaw #-}
-
--- | Build a lens from the van Laarhoven representation.
-mkLens :: R_Lens s t a b -> Lens s t a b
-mkLens = Optic
-{-# INLINE mkLens #-}
-
-mkIndexedLens :: R_IndexedLens i s t a b -> IndexedLens i s t a b
-mkIndexedLens = Optic
-{-# INLINE mkIndexedLens #-}
-
 lens :: (s -> a) -> (s -> b -> t) -> Lens s t a b
-lens sa sbt = mkLens (mkLensRaw sa sbt)
+lens sa sbt = fromRawLens (\afb s -> sbt s <$> afb (sa s))
 {-# INLINE lens #-}
-
--- | Explicitly cast an optic to a lens.
-toLens :: AsLens o => Optic o s t a b -> Lens s t a b
-toLens = sub
-{-# INLINE toLens #-}
 
 -- | Build an 'IndexedLens' from a 'Control.Lens.Getter.Getter' and
 -- a 'Control.Lens.Setter.Setter'.
 ilens :: (s -> (i, a)) -> (s -> b -> t) -> IndexedLens i s t a b
-ilens sia sbt = mkIndexedLens (\iafb s -> sbt s <$> uncurry (indexed iafb) (sia s))
+ilens sia sbt = fromRawIndexedLens (\iafb s -> sbt s <$> uncurry (indexed iafb) (sia s))
 {-# INLINE ilens #-}
 
 -- | Build an index-preserving 'Lens' from a 'Control.Lens.Getter.Getter' and a
 -- 'Control.Lens.Setter.Setter'.
-iplens :: (s -> a) -> (s -> b -> t) -> R_IndexPreservingLens s t a b
-iplens sa sbt pafb = cotabulate $ \ws -> sbt (extract ws) <$> cosieve pafb (sa <$> ws)
+iplens :: (s -> a) -> (s -> b -> t) -> IndexPreservingLens s t a b
+iplens sa sbt = 
+  fromRawIndexPreservingLens (\pafb -> cotabulate $ \ws -> sbt (extract ws) <$> cosieve pafb (sa <$> ws))
 {-# INLINE iplens #-}
 
 -- | This can be used to chain lens operations using @op=@ syntax
@@ -304,19 +287,10 @@ s &~ l = execState l s
 -- >>> [66,97,116,109,97,110] & each %%~ \a -> ("na", chr a)
 -- ("nananananana","Batman")
 --
--- For all that the definition of this combinator is just:
---
 -- @
--- ('%%~') ≡ 'id'
--- @
---
--- It may be beneficial to think about it as if it had these even more
--- restricted types, however:
---
--- @
--- ('%%~') :: 'Functor' f =>     'Control.Lens.Iso.Iso' s t a b       -> (a -> f b) -> s -> f t
+-- ('%%~') :: 'Functor' f =>     'Iso' s t a b       -> (a -> f b) -> s -> f t
 -- ('%%~') :: 'Functor' f =>     'Lens' s t a b      -> (a -> f b) -> s -> f t
--- ('%%~') :: 'Applicative' f => 'Control.Lens.Traversal.Traversal' s t a b -> (a -> f b) -> s -> f t
+-- ('%%~') :: 'Applicative' f => 'Traversal' s t a b -> (a -> f b) -> s -> f t
 -- @
 --
 -- When applied to a 'Traversal', it can edit the
@@ -353,29 +327,26 @@ s &~ l = execState l s
 -- ('%%=') :: ('MonadState' s m, 'Monoid' r) => 'Control.Lens.Traversal.Traversal' s s a b -> (a -> (r, b)) -> m r
 -- @
 
-toOver :: (k <: A_Over p f) => Optic k s t a b -> Over p f s t a b
-toOver = sub
-
-runOver :: (k <: A_Over p f) => Optic k s t a b -> R_Over p f s t a b
-runOver = runOptic . toOver
-
-toLensLike :: forall f k s t a b. (k <: A_LensLike f) => Optic k s t a b -> LensLike f s t a b
-toLensLike = sub
-
-runLensLike :: forall f k s t a b. (k <: A_LensLike f) => Optic k s t a b -> R_LensLike f s t a b
-runLensLike = runOptic . toLensLike
-
-toLensLikePair :: forall k s t a b. (k <: A_LensLike ((,) b)) => Optic k s t a b -> LensLike ((,) b) s t a b
-toLensLikePair = sub
-
-(%%=) :: (MonadState s m, k <: A_Over p ((,) r)) => Optic k s s a b -> p a (r, b) -> m r
+(%%=) :: (MonadState s m, AsOver p ((,) r) k) => Optic k s s a b -> p a (r, b) -> m r
 l %%= f = State.state (runOptic (toOver l) f)
 {-# INLINE (%%=) #-}
+
+-- | Build a lens from the van Laarhoven representation.
+fromRawLens :: R_Lens s t a b -> Lens s t a b
+fromRawLens = Optic
+{-# INLINE fromRawLens #-}
+
+fromRawIndexedLens :: R_IndexedLens i s t a b -> IndexedLens i s t a b
+fromRawIndexedLens = Optic
+{-# INLINE fromRawIndexedLens #-}
+
+fromRawIndexPreservingLens :: R_IndexPreservingLens s t a b -> IndexPreservingLens s t a b
+fromRawIndexPreservingLens = Optic
+{-# INLINE fromRawIndexPreservingLens #-}
 
 -------------------------------------------------------------------------------
 -- General Purpose Combinators
 -------------------------------------------------------------------------------
-
 
 #if !(MIN_VERSION_base(4,8,0))
 -- | Passes the result of the left side to the function on the right side (forward pipe operator).
@@ -456,9 +427,10 @@ fab ?? a = fmap ($ a) fab
 --
 -- >>> runState (modify (1:) >> modify (2:)) ^. (inside _2) $ []
 -- [2,1]
-inside :: Corepresentable p => ALens s t a b -> Lens (p e s) (p e t) (p e a) (p e b)
-inside l = Optic $ \f es -> 
+inside :: (Corepresentable p, AsLens k) => Optic k s t a b -> Lens (p e s) (p e t) (p e a) (p e b)
+inside l0 = Optic $ \f es -> 
      let 
+        l = toALens (toLens l0)
         i = cotabulate $ \e -> ipos $ runOptic l sell (cosieve es e)
         o ea = cotabulate $ \e -> ipeek (cosieve ea e) $ runOptic l sell (cosieve es e)
      in o <$> f i
@@ -566,6 +538,7 @@ locus :: IndexedComonadStore p => Lens (p a c s) (p b c s) a b
 locus = Optic $ \f w -> (`iseek` w) <$> f (ipos w)
 {-# INLINE locus #-}
 
+{-
 -------------------------------------------------------------------------------
 -- Cloning Lenses
 -------------------------------------------------------------------------------
@@ -579,19 +552,20 @@ locus = Optic $ \f w -> (`iseek` w) <$> f (ipos w)
 -- >>> let example l x = set (cloneLens l) (x^.cloneLens l + 1) x in example _2 ("hello",1,"you")
 -- ("hello",2,"you")
 cloneLens :: ALens s t a b -> Lens s t a b
-cloneLens l = mkLens (\afb s -> runPretext (runOptic l sell s) afb)
+cloneLens l = fromRawLens (\afb s -> runPretext (runOptic l sell s) afb)
 {-# INLINE cloneLens #-}
 
 -- | Clone a 'Lens' as an 'IndexedPreservingLens' that just passes through whatever
 -- index is on any 'IndexedLens', 'IndexedFold', 'IndexedGetter' or  'IndexedTraversal' it is composed with.
-cloneR_IndexPreservingLens :: R_ALens s t a b -> R_IndexPreservingLens s t a b
-cloneR_IndexPreservingLens l pafb = cotabulate $ \ws -> runPretext (l sell (extract ws)) $ \a -> cosieve pafb (a <$ ws)
-{-# INLINE cloneR_IndexPreservingLens #-}
+cloneIndexPreservingLens :: ALens s t a b -> IndexPreservingLens s t a b
+cloneIndexPreservingLens l = fromRawIndexPreservingLens (\pafb -> cotabulate $ \ws -> runPretext (runOptic l sell (extract ws)) $ \a -> cosieve pafb (a <$ ws))
+{-# INLINE cloneIndexPreservingLens #-}
 
 -- | Clone an 'IndexedLens' as an 'IndexedLens' with the same index.
 cloneIndexedLens :: AnIndexedLens i s t a b -> IndexedLens i s t a b
-cloneIndexedLens l = mkIndexedLens (\f s -> runPretext (runOptic l sell s) (Indexed (indexed f)))
+cloneIndexedLens l = fromRawIndexedLens (\f s -> runPretext (runOptic l sell s) (Indexed (indexed f)))
 {-# INLINE cloneIndexedLens #-}
+-}
 
 -------------------------------------------------------------------------------
 -- Setting and Remembering
@@ -1267,10 +1241,10 @@ l <<<>= b = toLensLike l %%= \a -> (a, a `mappend` b)
 --
 -- NB: This is limited to taking an actual 'Lens' than admitting a 'Control.Lens.Traversal.Traversal' because
 -- there are potential loss of state issues otherwise.
-(<<~) :: MonadState s m => ALens s s a b -> m b -> m b
+(<<~) :: (MonadState s m, AsLens k) => Optic k s s a b -> m b -> m b
 l <<~ mb = do
   b <- mb
-  modify $ \s -> ipeek b (runOptic l sell s)
+  modify $ \s -> ipeek b (runOptic (toALens (toLens l)) sell s)
   return b
 {-# INLINE (<<~) #-}
 
@@ -1415,11 +1389,12 @@ l <%@= f = l %%@= \ i a -> let b = f i a in (b, b)
 l <<%@= f = State.state (runOptic (toIndexedLensLike l) (Indexed $ \ i a -> (a, f i a)))
 {-# INLINE (<<%@=) #-}
 
+{-
 ------------------------------------------------------------------------------
 -- ALens Combinators
 ------------------------------------------------------------------------------
 
--- | A version of ('Control.Lens.Getter.^.') that works on 'R_ALens'.
+-- | A version of ('Control.Lens.Getter.^.') that works on 'ALens'.
 --
 -- >>> ("hello","world")^#_2
 -- "world"
@@ -1427,7 +1402,7 @@ l <<%@= f = State.state (runOptic (toIndexedLensLike l) (Indexed $ \ i a -> (a, 
 s ^# l = ipos (runOptic l sell s)
 {-# INLINE (^#) #-}
 
--- | A version of 'Control.Lens.Setter.set' that works on 'R_ALens'.
+-- | A version of 'Control.Lens.Setter.set' that works on 'ALens'.
 --
 -- >>> storing _2 "world" ("hello","there")
 -- ("hello","world")
@@ -1435,7 +1410,7 @@ storing :: ALens s t a b -> b -> s -> t
 storing l b s = ipeek b (runOptic l sell s)
 {-# INLINE storing #-}
 
--- | A version of ('Control.Lens.Setter..~') that works on 'R_ALens'.
+-- | A version of ('Control.Lens.Setter..~') that works on 'ALens'.
 --
 -- >>> ("hello","there") & _2 #~ "world"
 -- ("hello","world")
@@ -1443,7 +1418,7 @@ storing l b s = ipeek b (runOptic l sell s)
 (#~) l b s = ipeek b (runOptic l sell s)
 {-# INLINE (#~) #-}
 
--- | A version of ('Control.Lens.Setter.%~') that works on 'R_ALens'.
+-- | A version of ('Control.Lens.Setter.%~') that works on 'ALens'.
 --
 -- >>> ("hello","world") & _2 #%~ length
 -- ("hello",5)
@@ -1451,7 +1426,7 @@ storing l b s = ipeek b (runOptic l sell s)
 (#%~) l f s = ipeeks f (runOptic l sell s)
 {-# INLINE (#%~) #-}
 
--- | A version of ('%%~') that works on 'R_ALens'.
+-- | A version of ('%%~') that works on 'ALens'.
 --
 -- >>> ("hello","world") & _2 #%%~ \x -> (length x, x ++ "!")
 -- (5,("hello","world!"))
@@ -1509,6 +1484,7 @@ l <#= b = do
   l #= b
   return b
 {-# INLINE (<#=) #-}
+-}
 
 -- | There is a field for every type in the 'Void'. Very zen.
 --
@@ -1558,26 +1534,3 @@ united = Optic (\f v -> f () <&> \() -> v)
 fusing :: Functor f => LensLike (Yoneda f) s t a b -> LensLike f s t a b
 fusing t = Optic (\f -> lowerYoneda . runOptic t (liftYoneda . f))
 {-# INLINE fusing #-}
-
--- class Foo a b where t :: a -> b
-
--- instance (a ~ b) => Foo a b where t = id
-
--- foo :: Char
--- foo = let b = 'b' :: Foo Char Char => Char in b
-
--- foo' :: Char
--- foo' = let b = 'b' :: Foo Int Char => Char in b
-
--- type family BarMatch a b :: Constraint where
---   BarMatch a a = ()
---   BarMatch a b = TypeError (Text "uwu fucky wucky etc")
-
--- class Bar a b
--- instance (a ~ b, BarMatch a b) => Bar a b
-
--- bar :: Bar Int Int => Char
--- bar = 'a'
-
--- bar' :: Char
--- bar' = let b = 'b' :: Bar Int Char => Char in b

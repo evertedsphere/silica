@@ -134,66 +134,9 @@ import GHC.TypeLits hiding (type (*))
 -- >>> let nat :: R_Prism' Integer Natural; nat = prism toInteger $ \i -> if i < 0 then Left i else Right (fromInteger i)
 
 -------------------------------------------------------------------------------
--- R_Lenses
+-- Lenses
 -------------------------------------------------------------------------------
 
--- | A 'R_Lens' is actually a lens family as described in
--- <http://comonad.com/reader/2012/mirrored-lenses/>.
---
--- With great power comes great responsibility and a 'R_Lens' is subject to the
--- three common sense 'R_Lens' laws:
---
--- 1) You get back what you put in:
---
--- @
--- 'Control.R_Lens.R_Getter.view' l ('Control.R_Lens.R_Setter.set' l v s)  ≡ v
--- @
---
--- 2) Putting back what you got doesn't change anything:
---
--- @
--- 'Control.R_Lens.R_Setter.set' l ('Control.R_Lens.R_Getter.view' l s) s  ≡ s
--- @
---
--- 3) Setting twice is the same as setting once:
---
--- @
--- 'Control.R_Lens.R_Setter.set' l v' ('Control.R_Lens.R_Setter.set' l v s) ≡ 'Control.R_Lens.R_Setter.set' l v' s
--- @
---
--- These laws are strong enough that the 4 type parameters of a 'R_Lens' cannot
--- vary fully independently. For more on how they interact, read the \"Why is
--- it a R_Lens Family?\" section of
--- <http://comonad.com/reader/2012/mirrored-lenses/>.
---
--- There are some emergent properties of these laws:
---
--- 1) @'Control.R_Lens.R_Setter.set' l s@ must be injective for every @s@ This is a consequence of law #1
---
--- 2) @'Control.R_Lens.R_Setter.set' l@ must be surjective, because of law #2, which indicates that it is possible to obtain any 'v' from some 's' such that @'Control.R_Lens.R_Setter.set' s v = s@
---
--- 3) Given just the first two laws you can prove a weaker form of law #3 where the values @v@ that you are setting match:
---
--- @
--- 'Control.R_Lens.R_Setter.set' l v ('Control.R_Lens.R_Setter.set' l v s) ≡ 'Control.R_Lens.R_Setter.set' l v s
--- @
---
--- Every 'R_Lens' can be used directly as a 'Control.R_Lens.R_Setter.R_Setter' or 'R_Traversal'.
---
--- You can also use a 'R_Lens' for 'Control.R_Lens.R_Getter.Getting' as if it were a
--- 'R_Fold' or 'R_Getter'.
---
--- Since every 'R_Lens' is a valid 'R_Traversal', the
--- 'R_Traversal' laws are required of any 'R_Lens' you create:
---
--- @
--- l 'pure' ≡ 'pure'
--- 'fmap' (l f) '.' l g ≡ 'Data.Functor.Compose.getCompose' '.' l ('Data.Functor.Compose.Compose' '.' 'fmap' f '.' g)
--- @
---
--- @
--- type 'R_Lens' s t a b = forall f. 'Functor' f => 'R_LensLike' f s t a b
--- @
 type R_Lens s t a b = forall f. Functor f => (a -> f b) -> s -> f t
 
 -- | @
@@ -714,17 +657,83 @@ data A_Over (p :: Type -> Type -> Type) (f :: Type -> Type)
 data A_Optical (p :: Type -> Type -> Type) (q :: Type -> Type -> Type) (f :: Type -> Type)
 
 data A_Indexed (i :: Type) (o :: Type)
+data A_IndexPreserving (o :: Type)
 
 --------------------------------------------------------------------------------
 -- optic types
 --------------------------------------------------------------------------------
 
+-- vanilla
+
+-- | A 'Lens' is actually a lens family as described in
+-- <http://comonad.com/reader/2012/mirrored-lenses/>.
+--
+-- With great power comes great responsibility and a 'Lens' is subject to the
+-- three common sense 'Lens' laws:
+--
+-- 1) You get back what you put in:
+--
+-- @
+-- 'Control.Lens.Getter.view' l ('Control.Lens.Setter.set' l v s)  ≡ v
+-- @
+--
+-- 2) Putting back what you got doesn't change anything:
+--
+-- @
+-- 'Control.Lens.Setter.set' l ('Control.Lens.Getter.view' l s) s  ≡ s
+-- @
+--
+-- 3) Setting twice is the same as setting once:
+--
+-- @
+-- 'Control.Lens.Setter.set' l v' ('Control.Lens.Setter.set' l v s) ≡ 'Control.Lens.Setter.set' l v' s
+-- @
+--
+-- These laws are strong enough that the 4 type parameters of a 'Lens' cannot
+-- vary fully independently. For more on how they interact, read the \"Why is
+-- it a Lens Family?\" section of
+-- <http://comonad.com/reader/2012/mirrored-lenses/>.
+--
+-- There are some emergent properties of these laws:
+--
+-- 1) @'Control.Lens.Setter.set' l s@ must be injective for every @s@ This is a consequence of law #1
+--
+-- 2) @'Control.Lens.Setter.set' l@ must be surjective, because of law #2, which indicates that it is possible to obtain any 'v' from some 's' such that @'Control.Lens.Setter.set' s v = s@
+--
+-- 3) Given just the first two laws you can prove a weaker form of law #3 where the values @v@ that you are setting match:
+--
+-- @
+-- 'Control.Lens.Setter.set' l v ('Control.Lens.Setter.set' l v s) ≡ 'Control.Lens.Setter.set' l v s
+-- @
+--
+-- Every 'Lens' can be used directly as a 'Control.Lens.Setter.Setter' or 'Traversal'.
+--
+-- You can also use a 'Lens' for 'Control.Lens.Getter.Getting' as if it were a
+-- 'Fold' or 'Getter'.
+--
+-- Since every 'Lens' is a valid 'Traversal', the
+-- 'Traversal' laws are required of any 'Lens' you create:
+--
+-- @
+-- l 'pure' ≡ 'pure'
+-- 'fmap' (l f) '.' l g ≡ 'Data.Functor.Compose.getCompose' '.' l ('Data.Functor.Compose.Compose' '.' 'fmap' f '.' g)
+-- @
+--
+-- @
+-- type 'Lens' s t a b = forall f. 'Functor' f => 'LensLike' f s t a b
+-- @
 type Lens                  s t a b = Optic  A_Lens                     s t a b
+
 type Traversal             s t a b = Optic  A_Traversal                s t a b
+
 type Traversal1            s t a b = Optic  A_Traversal1               s t a b
+
 type Setter                s t a b = Optic  A_Setter                   s t a b
+
 type Equality              s t a b = Optic  A_Equality                 s t a b
+
 type Prism                 s t a b = Optic  A_Prism                    s t a b
+
 type Iso                   s t a b = Optic  A_Iso                      s t a b
 
 type Getter                s   a   = Optic' A_Getter                   s   a
@@ -749,6 +758,8 @@ type LensLike'           f s   a   = LensLike                        f s s a a
 type Over'           p   f s   a   = Over                        p   f s s a a
 type Optical'        p q f s   a   = Optical                     p q f s s a a
 
+-- indexed
+
 type IndexedLens          i   s t a b = Optic  (A_Indexed i A_Lens)          s t a b
 type IndexedTraversal     i   s t a b = Optic  (A_Indexed i A_Traversal)     s t a b
 type IndexedTraversal1    i   s t a b = Optic  (A_Indexed i A_Traversal)     s t a b
@@ -766,6 +777,23 @@ type IndexedSetter'       i   s   a   = IndexedSetter                      i s s
 
 type IndexedLensLike           i f s t a b = Optic  (A_Indexed i (A_LensLike f)) s t a b
 type IndexedLensLike'          i f s   a   = IndexedLensLike i f s s a a
+
+-- index-preserving
+
+type IndexPreservingLens            s t a b = Optic  (A_IndexPreserving A_Lens)          s t a b
+type IndexPreservingTraversal       s t a b = Optic  (A_IndexPreserving A_Traversal)     s t a b
+type IndexPreservingTraversal1      s t a b = Optic  (A_IndexPreserving A_Traversal)     s t a b
+type IndexPreservingSetter          s t a b = Optic  (A_IndexPreserving A_Setter)        s t a b
+type IndexPreservingGetter          s t a b = Optic  (A_IndexPreserving A_Getter)        s t a b
+
+-- type IndexPreservingGetting       r s   a   = Optic' (A_IndexPreserving (A_Getting r))   s   a
+type IndexPreservingFold            s   a   = Optic' (A_IndexPreserving A_Fold)          s   a
+type IndexPreservingFold1           s   a   = Optic' (A_IndexPreserving A_Fold1)         s   a
+
+type IndexPreservingLens'           s   a   = IndexPreservingLens                        s s a a
+type IndexPreservingTraversal'      s   a   = IndexPreservingTraversal                   s s a a
+type IndexPreservingTraversal1'     s   a   = IndexPreservingTraversal1                  s s a a
+type IndexPreservingSetter'         s   a   = IndexPreservingSetter                      s s a a
 
 --------------------------------------------------------------------------------
 -- fiddly bits for subtyping and composition
@@ -834,8 +862,16 @@ type instance Cts (A_Indexed i (A_LensLike g))           p q f = (Fn q, f ~ g, I
 type instance Cts (A_Indexed i A_Lens)        p q f = (Fn q, Indexable i p, Functor f)
 type instance Cts (A_Indexed i A_Traversal)   p q f = (Fn q, Indexable i p, Applicative f)
 type instance Cts (A_Indexed i A_Setter)      p q f = (Fn q, Indexable i p, Settable f)
--- type instance Cts (A_Indexed i (A_Getting r)) p q f = (Fn q, p ~ Indexed_ i, f ~ Const r)
 type instance Cts (A_Indexed i A_Fold)        p q f = (Fn q, Indexable i p, Contravariant f, Applicative f)
+type instance Cts (A_Indexed i (A_Getting r)) p q f = (Fn q, p ~ Indexed i, f ~ Const r)
+
+type instance Cts (A_IndexPreserving A_Lens) p q f = (p ~ q, Conjoined p, Functor f)
+type instance Cts (A_IndexPreserving A_Traversal) p q f = (p ~ q, Conjoined p, Applicative f)
+type instance Cts (A_IndexPreserving A_Traversal1) p q f = (p ~ q, Conjoined p, Apply f)
+type instance Cts (A_IndexPreserving A_Setter) p q f = (p ~ q, Conjoined p, Settable f)
+type instance Cts (A_IndexPreserving A_Getter) p q f = (p ~ q, Conjoined p, Contravariant f, Functor f)
+type instance Cts (A_IndexPreserving A_Fold) p q f = (p ~ q, Conjoined p, Contravariant f, Applicative f)
+type instance Cts (A_IndexPreserving A_Fold1) p q f = (p ~ q, Conjoined p, Contravariant f, Apply f)
 
 ----------------------------------------------------------------------
 -- composing optics
