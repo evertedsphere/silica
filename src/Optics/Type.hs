@@ -707,7 +707,11 @@ data A_Fold
 data A_Fold1
 data A_Setter
 data A_Getter
+
 data A_Getting (r :: Type)
+data A_LensLike (p :: Type -> Type)
+data A_Over (p :: Type -> Type -> Type) (f :: Type -> Type)
+data A_Optical (p :: Type -> Type -> Type) (q :: Type -> Type -> Type) (f :: Type -> Type)
 
 data A_Indexed (i :: Type) (o :: Type)
 
@@ -737,6 +741,14 @@ type Setter'               s   a   = Setter                            s s a a
 type Prism'                s   a   = Prism                             s s a a
 type Iso'                  s   a   = Iso                               s s a a
 
+type LensLike            f s t a b = Optic  (A_LensLike f)             s t a b
+type Over            p   f s t a b = Optic  (A_Over p f)               s t a b
+type Optical         p q f s t a b = Optic  (A_Optical p q f)          s t a b
+
+type LensLike'           f s   a   = LensLike                        f s s a a
+type Over'           p   f s   a   = Over                        p   f s s a a
+type Optical'        p q f s   a   = Optical                     p q f s s a a
+
 type IndexedLens          i   s t a b = Optic  (A_Indexed i A_Lens)          s t a b
 type IndexedTraversal     i   s t a b = Optic  (A_Indexed i A_Traversal)     s t a b
 type IndexedTraversal1    i   s t a b = Optic  (A_Indexed i A_Traversal)     s t a b
@@ -751,6 +763,9 @@ type IndexedLens'         i   s   a   = IndexedLens                        i s s
 type IndexedTraversal'    i   s   a   = IndexedTraversal                   i s s a a
 type IndexedTraversal1'   i   s   a   = IndexedTraversal1                  i s s a a
 type IndexedSetter'       i   s   a   = IndexedSetter                      i s s a a
+
+type IndexedLensLike           i f s t a b = Optic  (A_Indexed i (A_LensLike f)) s t a b
+type IndexedLensLike'          i f s   a   = IndexedLensLike i f s s a a
 
 --------------------------------------------------------------------------------
 -- fiddly bits for subtyping and composition
@@ -779,8 +794,6 @@ subIn f = f . sub
 -- | Read "can act as" or "is".
 class    o <: l where 
   implies :: proxy o l p q f -> (Cts o p q f => r) -> (Cts l p q f => r)
-
-instance o <: o where implies _ r = r
 
 -- commutative
 class (o <: m, l <: m) => Join o l m | o l -> m
@@ -811,6 +824,12 @@ type instance Cts A_Fold                   p q f = (Fn2 p q, Contravariant f, Ap
 type instance Cts A_Fold1                  p q f = (Fn2 p q, Contravariant f, Apply f)
 
 type instance Cts (A_Getting r)            p q f = (Fn2 p q, f ~ Const r)
+
+type instance Cts (A_LensLike f')          p q f = (Fn2 p q, f ~ f')
+type instance Cts (A_Over p' f')           p q f = (Fn q, p ~ p', f ~ f')
+type instance Cts (A_Optical p' q' f')     p q f = (p ~ p', q ~ q', f ~ f')
+
+type instance Cts (A_Indexed i (A_LensLike g))           p q f = (Fn q, f ~ g, Indexable i p)
 
 type instance Cts (A_Indexed i A_Lens)        p q f = (Fn q, Indexable i p, Functor f)
 type instance Cts (A_Indexed i A_Traversal)   p q f = (Fn q, Indexable i p, Applicative f)
@@ -843,6 +862,28 @@ instance Chain (A_Indexed i A_Traversal) where l %% r = Optic (runOptic l . runO
 --------------------------------------------------------------------------------
 -- the subtyping lattice
 --------------------------------------------------------------------------------
+
+-- instance o <: o where implies _ r = r
+
+instance A_Lens <: A_Lens where implies _ r = r
+instance A_Traversal <: A_Traversal where implies _ r = r
+instance A_Traversal1 <: A_Traversal1 where implies _ r = r
+instance A_Prism <: A_Prism where implies _ r = r
+instance A_Iso <: A_Iso where implies _ r = r
+instance A_Equality <: A_Equality where implies _ r = r
+instance A_Review <: A_Review where implies _ r = r
+instance A_Fold <: A_Fold where implies _ r = r
+instance A_Fold1 <: A_Fold1 where implies _ r = r
+instance A_Setter <: A_Setter where implies _ r = r
+instance A_Getter <: A_Getter where implies _ r = r
+
+instance (r ~ s) => A_Getting r <: A_Getting s where implies _ r = r
+
+instance (p ~ p', f ~ f') => A_Over p f <: A_Over p' f' where implies _ r = r
+
+-- | TODO do some form of recursion of the form o <: o' (split Cts into more TFs?)
+-- TODO split into more instances
+instance (i ~ j, o ~ o') => A_Indexed i o <: A_Indexed j o' where implies _ r = r
 
 instance A_Equality  <: A_Fold      where implies _ r = r
 instance A_Getter    <: A_Fold      where implies _ r = r
@@ -903,11 +944,43 @@ instance A_Indexed i A_Fold <: A_Fold where implies _ r = r
 
 instance Monoid r => A_Indexed i A_Fold <: A_Getting r where implies _ r = r
 
+instance A_Equality <: A_LensLike f where implies _ r = r
+instance A_Equality <: A_Over (->) f where implies _ r = r
+
+instance Functor f => A_Lens <: A_LensLike f where implies _ r = r
+instance Applicative f => A_Traversal <: A_LensLike f where implies _ r = r
+
+instance (p ~ (->), f ~ g, LensLikeCt f g) => A_Over p f <: A_LensLike g where implies _ r = r
+
+instance (p ~ (->), f ~ g, LensLikeCt f g) => A_LensLike f <: A_Over p g where implies _ r = r
+
+instance (f ~ g, LensLikeCt f g) => A_LensLike f <: A_LensLike g where implies _ r = r
+
+type family LensLikeCt f g :: Constraint where
+  LensLikeCt f f = ()
+  LensLikeCt f g = TypeError (Text "!!")
+
 --------------------------------------------------------------------------------
 -- Join rules
 --------------------------------------------------------------------------------
 
-instance Join o           o           o
+-- instance Join o           o           o
+
+instance Join A_Lens A_Lens A_Lens
+instance Join A_Traversal A_Traversal A_Traversal
+instance Join A_Traversal1 A_Traversal1 A_Traversal1
+instance Join A_Prism A_Prism A_Prism
+instance Join A_Iso A_Iso A_Iso
+instance Join A_Equality A_Equality A_Equality
+instance Join A_Review A_Review A_Review
+instance Join A_Fold A_Fold A_Fold
+instance Join A_Fold1 A_Fold1 A_Fold1
+instance Join A_Setter A_Setter A_Setter
+instance Join A_Getter A_Getter A_Getter
+
+instance (r ~ s, s ~ t) => Join (A_Getting r) (A_Getting s) (A_Getting t)
+
+instance (i ~ i', i ~ i'') => Join (A_Indexed i k) (A_Indexed i' k) (A_Indexed i'' k)
 
 instance Join A_Equality  A_Fold      A_Fold
 instance Join A_Equality  A_Getter    A_Getter
@@ -1058,6 +1131,15 @@ instance (o <: A_Setter) => AsSetter o
 
 class (o <: A_Getter) => AsGetter o
 instance (o <: A_Getter) => AsGetter o
+
+class (o <: A_LensLike f) => AsLensLike f o
+instance (o <: A_LensLike f) => AsLensLike f o
+
+class (o <: A_Indexed i (A_LensLike f)) => AsIndexedLensLike i f o
+instance (o <: A_Indexed i (A_LensLike f)) => AsIndexedLensLike i f o
+
+class (o <: A_Over p f) => AsOver p f o
+instance (o <: A_Over p f) => AsOver p f o
 
 class (o <: A_Getting r) => AsGetting r o
 instance (o <: A_Getting r) => AsGetting r o

@@ -1,4 +1,11 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE NoMonomorphismRestriction #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -22,50 +29,52 @@
 -- Stability   :  provisional
 -- Portability :  Rank2Types
 --
--- A @'R_Lens' s t a b@ is a purely functional reference.
+-- A @'Lens' s t a b@ is a purely functional reference.
 --
--- While a 'Control.R_Lens.R_Traversal.R_Traversal' could be used for
--- 'Control.R_Lens.R_Getter.Getting' like a valid 'Control.R_Lens.R_Fold.R_Fold', it
--- wasn't a valid 'Control.R_Lens.R_Getter.R_Getter' as a
--- 'Control.R_Lens.R_Getter.R_Getter' can't require an 'Applicative' constraint.
+-- While a 'Control.Lens.Traversal.Traversal' could be used for
+-- 'Control.Lens.Getter.Getting' like a valid 'Control.Lens.Fold.Fold', it
+-- wasn't a valid 'Control.Lens.Getter.Getter' as a
+-- 'Control.Lens.Getter.Getter' can't require an 'Applicative' constraint.
 --
 -- 'Functor', however, is a constraint on both.
 --
 -- @
--- type 'R_Lens' s t a b = forall f. 'Functor' f => (a -> f b) -> s -> f t
+-- type 'Lens' s t a b = forall f. 'Functor' f => (a -> f b) -> s -> f t
 -- @
 --
--- Every 'R_Lens' is a valid 'Control.R_Lens.R_Setter.R_Setter'.
+-- Every 'Lens' is a valid 'Control.Lens.Setter.Setter'.
 --
--- Every 'R_Lens' can be used for 'Control.R_Lens.R_Getter.Getting' like a
--- 'Control.R_Lens.R_Fold.R_Fold' that doesn't use the 'Applicative' or
+-- Every 'Lens' can be used for 'Control.Lens.Getter.Getting' like a
+-- 'Control.Lens.Fold.Fold' that doesn't use the 'Applicative' or
 -- 'Contravariant'.
 --
--- Every 'R_Lens' is a valid 'Control.R_Lens.R_Traversal.R_Traversal' that only uses
+-- Every 'Lens' is a valid 'Control.Lens.Traversal.Traversal' that only uses
 -- the 'Functor' part of the 'Applicative' it is supplied.
 --
--- Every 'R_Lens' can be used for 'Control.R_Lens.R_Getter.Getting' like a valid
--- 'Control.R_Lens.R_Getter.R_Getter'.
+-- Every 'Lens' can be used for 'Control.Lens.Getter.Getting' like a valid
+-- 'Control.Lens.Getter.Getter'.
 --
--- Since every 'R_Lens' can be used for 'Control.R_Lens.R_Getter.Getting' like a
--- valid 'Control.R_Lens.R_Getter.R_Getter' it follows that it must view exactly one element in the
+-- Since every 'Lens' can be used for 'Control.Lens.Getter.Getting' like a
+-- valid 'Control.Lens.Getter.Getter' it follows that it must view exactly one element in the
 -- structure.
 --
--- The 'R_Lens' laws follow from this property and the desire for it to act like
+-- The 'Lens' laws follow from this property and the desire for it to act like
 -- a 'Data.Traversable.Traversable' when used as a
--- 'Control.R_Lens.R_Traversal.R_Traversal'.
+-- 'Control.Lens.Traversal.Traversal'.
 --
 -- In the examples below, 'getter' and 'setter' are supplied as example getters
 -- and setters, and are not actual functions supplied by this package.
 -------------------------------------------------------------------------------
-module Optics.Lens
+module Optics.Lens 
   (
-  -- * R_Lenses
-    R_Lens, R_Lens'
-  , R_IndexedLens, R_IndexedLens'
-  -- ** Concrete R_Lenses
+  -- * Lenses
+    Lens, Lens'
+  , IndexedLens, IndexedLens'
+  -- ** Concrete Lenses
   , R_ALens, R_ALens'
   , R_AnIndexedLens, R_AnIndexedLens'
+  , ALens, ALens'
+  , AnIndexedLens, AnIndexedLens'
 
   -- * Combinators
   , lens, ilens, iplens
@@ -99,10 +108,10 @@ module Optics.Lens
   , (<<||=), (<<&&=), (<<<>=)
   , (<<~)
 
-  -- * Cloning R_Lenses
-  , cloneR_Lens
-  , cloneR_IndexPreservingLens
-  , cloneR_IndexedLens
+  -- * Cloning Lenses
+  -- , cloneLens
+  -- , cloneIndexPreservingLens
+  -- , cloneIndexedLens
 
   -- * Arrow operators
   , overA
@@ -110,10 +119,10 @@ module Optics.Lens
   -- * R_ALens Combinators
   , storing
   , (^#)
-  , ( #~ ), ( #%~ ), ( #%%~ ), (<#~), (<#%~)
-  , ( #= ), ( #%= ), ( #%%= ), (<#=), (<#%=)
+  , (#~), (#%~), (#%%~), (<#~), (<#%~)
+  , (#=), (#%=), (#%%=), (<#=), (<#%=)
 
-  -- * Common R_Lenses
+  -- * Common Lenses
   , devoid
   , united
 
@@ -122,7 +131,7 @@ module Optics.Lens
   , Context'
   , locus
 
-  -- * R_Lens fusion
+  -- * Lens fusion
   , fusing
   ) where
 
@@ -149,12 +158,15 @@ import Data.Function ((&))
 import Data.Functor ((<&>))
 #endif
 
+import GHC.TypeLits
+import GHC.Exts (Constraint)
+
 #ifdef HLINT
 {-# ANN module "HLint: ignore Use ***" #-}
 #endif
 
 -- $setup
--- >>> :set -XNoR_OverloadedStrings
+-- >>> :set -XNoOverloadedStrings
 -- >>> import Optics
 -- >>> import Control.Monad.State
 -- >>> import Data.Char (chr)
@@ -180,34 +192,38 @@ infixr 2 <<~
 infixl 1 ??, &~
 
 -------------------------------------------------------------------------------
--- R_Lenses
+-- Lenses
 -------------------------------------------------------------------------------
 
--- | When you see this as an argument to a function, it expects a 'R_Lens'.
+-- | When you see this as an argument to a function, it expects a 'Lens'.
 --
--- This type can also be used when you need to store a 'R_Lens' in a container,
--- since it is rank-1. You can turn them back into a 'R_Lens' with 'cloneR_Lens',
+-- This type can also be used when you need to store a 'Lens' in a container,
+-- since it is rank-1. You can turn them back into a 'Lens' with 'cloneLens',
 -- or use it directly with combinators like 'storing' and ('^#').
 type R_ALens s t a b = R_LensLike (Pretext (->) a b) s t a b
+type ALens s t a b = LensLike (Pretext (->) a b) s t a b
 
 -- | @
 -- type 'R_ALens'' = 'Simple' 'R_ALens'
 -- @
 type R_ALens' s a = R_ALens s s a a
+type ALens' s a = ALens s s a a
 
--- | When you see this as an argument to a function, it expects an 'R_IndexedLens'
+-- | When you see this as an argument to a function, it expects an 'IndexedLens'
 type R_AnIndexedLens i s t a b = R_Optical (Indexed i) (->) (Pretext (Indexed i) a b) s t a b
+type AnIndexedLens i s t a b = Optical (Indexed i) (->) (Pretext (Indexed i) a b) s t a b
 
 -- | @
 -- type 'R_AnIndexedLens'' = 'Simple' ('R_AnIndexedLens' i)
 -- @
 type R_AnIndexedLens' i s a  = R_AnIndexedLens i s s a a
+type AnIndexedLens' i s a  = AnIndexedLens i s s a a
 
 --------------------------
--- Constructing R_Lenses
+-- Constructing Lenses
 --------------------------
 
--- | Build a 'R_Lens' from a getter and a setter.
+-- | Build a 'Lens' from a getter and a setter.
 --
 -- @
 -- 'lens' :: 'Functor' f => (s -> a) -> (s -> b -> t) -> (a -> f b) -> s -> f t
@@ -223,19 +239,23 @@ type R_AnIndexedLens' i s a  = R_AnIndexedLens i s s a a
 -- setter s (f (getter s))
 --
 -- @
--- 'lens' :: (s -> a) -> (s -> a -> s) -> 'R_Lens'' s a
+-- 'lens' :: (s -> a) -> (s -> a -> s) -> 'Lens'' s a
 -- @
-r_lens :: (s -> a) -> (s -> b -> t) -> R_Lens s t a b
-r_lens sa sbt afb s = sbt s <$> afb (sa s)
-{-# INLINE r_lens #-}
+mkLensRaw :: (s -> a) -> (s -> b -> t) -> R_Lens s t a b
+mkLensRaw sa sbt afb s = sbt s <$> afb (sa s)
+{-# INLINE mkLensRaw #-}
 
 -- | Build a lens from the van Laarhoven representation.
-vlLens :: R_Lens s t a b -> Lens s t a b
-vlLens = Optic
-{-# INLINE vlLens #-}
+mkLens :: R_Lens s t a b -> Lens s t a b
+mkLens = Optic
+{-# INLINE mkLens #-}
+
+mkIndexedLens :: R_IndexedLens i s t a b -> IndexedLens i s t a b
+mkIndexedLens = Optic
+{-# INLINE mkIndexedLens #-}
 
 lens :: (s -> a) -> (s -> b -> t) -> Lens s t a b
-lens sa sbt = vlLens (\f s -> sbt s <$> f (sa s))
+lens sa sbt = mkLens (mkLensRaw sa sbt)
 {-# INLINE lens #-}
 
 -- | Explicitly cast an optic to a lens.
@@ -243,14 +263,14 @@ toLens :: AsLens o => Optic o s t a b -> Lens s t a b
 toLens = sub
 {-# INLINE toLens #-}
 
--- | Build an 'IndexedLens' from a 'Control.R_Lens.R_Getter.R_Getter' and
--- a 'Control.R_Lens.R_Setter.R_Setter'.
+-- | Build an 'IndexedLens' from a 'Control.Lens.Getter.Getter' and
+-- a 'Control.Lens.Setter.Setter'.
 ilens :: (s -> (i, a)) -> (s -> b -> t) -> IndexedLens i s t a b
-ilens sia sbt = Optic (\iafb s -> sbt s <$> uncurry (indexed iafb) (sia s))
+ilens sia sbt = mkIndexedLens (\iafb s -> sbt s <$> uncurry (indexed iafb) (sia s))
 {-# INLINE ilens #-}
 
--- | Build an index-preserving 'R_Lens' from a 'Control.R_Lens.R_Getter.R_Getter' and a
--- 'Control.R_Lens.R_Setter.R_Setter'.
+-- | Build an index-preserving 'Lens' from a 'Control.Lens.Getter.Getter' and a
+-- 'Control.Lens.Setter.Setter'.
 iplens :: (s -> a) -> (s -> b -> t) -> R_IndexPreservingLens s t a b
 iplens sa sbt pafb = cotabulate $ \ws -> sbt (extract ws) <$> cosieve pafb (sa <$> ws)
 {-# INLINE iplens #-}
@@ -274,10 +294,10 @@ s &~ l = execState l s
 
 -- | ('%%~') can be used in one of two scenarios:
 --
--- When applied to a 'R_Lens', it can edit the target of the 'R_Lens' in a
+-- When applied to a 'Lens', it can edit the target of the 'Lens' in a
 -- structure, extracting a functorial result.
 --
--- When applied to a 'R_Traversal', it can edit the
+-- When applied to a 'Traversal', it can edit the
 -- targets of the traversals, extracting an applicative summary of its
 -- actions.
 --
@@ -294,27 +314,27 @@ s &~ l = execState l s
 -- restricted types, however:
 --
 -- @
--- ('%%~') :: 'Functor' f =>     'Control.R_Lens.R_Iso.R_Iso' s t a b       -> (a -> f b) -> s -> f t
--- ('%%~') :: 'Functor' f =>     'R_Lens' s t a b      -> (a -> f b) -> s -> f t
--- ('%%~') :: 'Applicative' f => 'Control.R_Lens.R_Traversal.R_Traversal' s t a b -> (a -> f b) -> s -> f t
+-- ('%%~') :: 'Functor' f =>     'Control.Lens.Iso.Iso' s t a b       -> (a -> f b) -> s -> f t
+-- ('%%~') :: 'Functor' f =>     'Lens' s t a b      -> (a -> f b) -> s -> f t
+-- ('%%~') :: 'Applicative' f => 'Control.Lens.Traversal.Traversal' s t a b -> (a -> f b) -> s -> f t
 -- @
 --
--- When applied to a 'R_Traversal', it can edit the
+-- When applied to a 'Traversal', it can edit the
 -- targets of the traversals, extracting a supplemental monoidal summary
 -- of its actions, by choosing @f = ((,) m)@
 --
 -- @
--- ('%%~') ::             'Control.R_Lens.R_Iso.R_Iso' s t a b       -> (a -> (r, b)) -> s -> (r, t)
--- ('%%~') ::             'R_Lens' s t a b      -> (a -> (r, b)) -> s -> (r, t)
--- ('%%~') :: 'Monoid' m => 'Control.R_Lens.R_Traversal.R_Traversal' s t a b -> (a -> (m, b)) -> s -> (m, t)
+-- ('%%~') ::             'Control.Lens.Iso.Iso' s t a b       -> (a -> (r, b)) -> s -> (r, t)
+-- ('%%~') ::             'Lens' s t a b      -> (a -> (r, b)) -> s -> (r, t)
+-- ('%%~') :: 'Monoid' m => 'Control.Lens.Traversal.Traversal' s t a b -> (a -> (m, b)) -> s -> (m, t)
 -- @
-(%%~) :: R_LensLike f s t a b -> (a -> f b) -> s -> f t
-(%%~) = id
+(%%~) :: AsLensLike f k => Optic k s t a b -> (a -> f b) -> s -> f t
+(%%~) = runLensLike
 {-# INLINE (%%~) #-}
 
--- | Modify the target of a 'R_Lens' in the current state returning some extra
+-- | Modify the target of a 'Lens' in the current state returning some extra
 -- information of type @r@ or modify all targets of a
--- 'Control.R_Lens.R_Traversal.R_Traversal' in the current state, extracting extra
+-- 'Control.Lens.Traversal.Traversal' in the current state, extracting extra
 -- information of type @r@ and return a monoidal summary of the changes.
 --
 -- >>> runState (_1 %%= \x -> (f x, g x)) (a,b)
@@ -328,19 +348,28 @@ s &~ l = execState l s
 -- following more restricted type signatures:
 --
 -- @
--- ('%%=') :: 'MonadState' s m             => 'Control.R_Lens.R_Iso.R_Iso' s s a b       -> (a -> (r, b)) -> m r
--- ('%%=') :: 'MonadState' s m             => 'R_Lens' s s a b      -> (a -> (r, b)) -> m r
--- ('%%=') :: ('MonadState' s m, 'Monoid' r) => 'Control.R_Lens.R_Traversal.R_Traversal' s s a b -> (a -> (r, b)) -> m r
+-- ('%%=') :: 'MonadState' s m             => 'Control.Lens.Iso.Iso' s s a b       -> (a -> (r, b)) -> m r
+-- ('%%=') :: 'MonadState' s m             => 'Lens' s s a b      -> (a -> (r, b)) -> m r
+-- ('%%=') :: ('MonadState' s m, 'Monoid' r) => 'Control.Lens.Traversal.Traversal' s s a b -> (a -> (r, b)) -> m r
 -- @
-(%%=) :: MonadState s m => R_Over p ((,) r) s s a b -> p a (r, b) -> m r
-#if MIN_VERSION_mtl(2,1,1)
-l %%= f = State.state (l f)
-#else
-l %%= f = do
-  (r, s) <- State.gets (l f)
-  State.put s
-  return r
-#endif
+
+toOver :: (k <: A_Over p f) => Optic k s t a b -> Over p f s t a b
+toOver = sub
+
+runOver :: (k <: A_Over p f) => Optic k s t a b -> R_Over p f s t a b
+runOver = runOptic . toOver
+
+toLensLike :: forall f k s t a b. (k <: A_LensLike f) => Optic k s t a b -> LensLike f s t a b
+toLensLike = sub
+
+runLensLike :: forall f k s t a b. (k <: A_LensLike f) => Optic k s t a b -> R_LensLike f s t a b
+runLensLike = runOptic . toLensLike
+
+toLensLikePair :: forall k s t a b. (k <: A_LensLike ((,) b)) => Optic k s t a b -> LensLike ((,) b) s t a b
+toLensLikePair = sub
+
+(%%=) :: (MonadState s m, k <: A_Over p ((,) r)) => Optic k s s a b -> p a (r, b) -> m r
+l %%= f = State.state (runOptic (toOver l) f)
 {-# INLINE (%%=) #-}
 
 -------------------------------------------------------------------------------
@@ -361,7 +390,7 @@ l %%= f = do
 -- >>> "hello" & length & succ
 -- 6
 --
--- This combinator is commonly used when applying multiple 'R_Lens' operations in sequence.
+-- This combinator is commonly used when applying multiple 'Lens' operations in sequence.
 --
 -- >>> ("hello","world") & _1.element 0 .~ 'j' & _1.element 4 .~ 'y'
 -- ("jelly","world")
@@ -412,13 +441,13 @@ fab ?? a = fmap ($ a) fab
 {-# INLINE (??) #-}
 
 -------------------------------------------------------------------------------
--- Common R_Lenses
+-- Common Lenses
 -------------------------------------------------------------------------------
 
--- | Lift a 'R_Lens' so it can run under a function (or other corepresentable profunctor).
+-- | Lift a 'Lens' so it can run under a function (or other corepresentable profunctor).
 --
 -- @
--- 'inside' :: 'R_Lens' s t a b -> 'R_Lens' (e -> s) (e -> t) (e -> a) (e -> b)
+-- 'inside' :: 'Lens' s t a b -> 'Lens' (e -> s) (e -> t) (e -> a) (e -> b)
 -- @
 --
 --
@@ -427,14 +456,16 @@ fab ?? a = fmap ($ a) fab
 --
 -- >>> runState (modify (1:) >> modify (2:)) ^. (inside _2) $ []
 -- [2,1]
-inside :: Corepresentable p => R_ALens s t a b -> R_Lens (p e s) (p e t) (p e a) (p e b)
-inside l f es = o <$> f i where
-  i = cotabulate $ \ e -> ipos $ l sell (cosieve es e)
-  o ea = cotabulate $ \ e -> ipeek (cosieve ea e) $ l sell (cosieve es e)
+inside :: Corepresentable p => ALens s t a b -> Lens (p e s) (p e t) (p e a) (p e b)
+inside l = Optic $ \f es -> 
+     let 
+        i = cotabulate $ \e -> ipos $ runOptic l sell (cosieve es e)
+        o ea = cotabulate $ \e -> ipeek (cosieve ea e) $ runOptic l sell (cosieve es e)
+     in o <$> f i
 {-# INLINE inside #-}
 
 {-
--- | Lift a 'R_Lens' so it can run under a function (or any other corepresentable functor).
+-- | Lift a 'Lens' so it can run under a function (or any other corepresentable functor).
 insideF :: F.Representable f => R_ALens s t a b -> R_Lens (f s) (f t) (f a) (f b)
 insideF l f es = o <$> f i where
   i = F.tabulate $ \e -> ipos $ l sell (F.index es e)
@@ -449,21 +480,23 @@ insideF l f es = o <$> f i where
 -- @
 --
 -- @
--- 'choosing' :: 'Control.R_Lens.R_Getter.R_Getter' s a     -> 'Control.R_Lens.R_Getter.R_Getter' s' a     -> 'Control.R_Lens.R_Getter.R_Getter' ('Either' s s') a
--- 'choosing' :: 'Control.R_Lens.R_Fold.R_Fold' s a       -> 'Control.R_Lens.R_Fold.R_Fold' s' a       -> 'Control.R_Lens.R_Fold.R_Fold' ('Either' s s') a
--- 'choosing' :: 'R_Lens'' s a      -> 'R_Lens'' s' a      -> 'R_Lens'' ('Either' s s') a
--- 'choosing' :: 'Control.R_Lens.R_Traversal.R_Traversal'' s a -> 'Control.R_Lens.R_Traversal.R_Traversal'' s' a -> 'Control.R_Lens.R_Traversal.R_Traversal'' ('Either' s s') a
--- 'choosing' :: 'Control.R_Lens.R_Setter.R_Setter'' s a    -> 'Control.R_Lens.R_Setter.R_Setter'' s' a    -> 'Control.R_Lens.R_Setter.R_Setter'' ('Either' s s') a
+-- 'choosing' :: 'Control.Lens.Getter.Getter' s a     -> 'Control.Lens.Getter.Getter' s' a     -> 'Control.Lens.Getter.Getter' ('Either' s s') a
+-- 'choosing' :: 'Control.Lens.Fold.Fold' s a       -> 'Control.Lens.Fold.Fold' s' a       -> 'Control.Lens.Fold.Fold' ('Either' s s') a
+-- 'choosing' :: 'Lens'' s a      -> 'Lens'' s' a      -> 'Lens'' ('Either' s s') a
+-- 'choosing' :: 'Control.Lens.Traversal.Traversal'' s a -> 'Control.Lens.Traversal.Traversal'' s' a -> 'Control.Lens.Traversal.Traversal'' ('Either' s s') a
+-- 'choosing' :: 'Control.Lens.Setter.Setter'' s a    -> 'Control.Lens.Setter.Setter'' s' a    -> 'Control.Lens.Setter.Setter'' ('Either' s s') a
 -- @
-choosing :: Functor f
-       => R_LensLike f s t a b
-       -> R_LensLike f s' t' a b
-       -> R_LensLike f (Either s s') (Either t t') a b
-choosing l _ f (Left a)   = Left <$> l f a
-choosing _ r f (Right a') = Right <$> r f a'
+choosing :: (Functor f, AsLensLike f k)
+       => Optic k s t a b
+       -> Optic k s' t' a b
+       -> LensLike f (Either s s') (Either t t') a b
+choosing l r = Optic $ \f e -> case e of
+  Left a -> Left <$> runLensLike l f a
+  Right a' -> Right <$> runLensLike r f a'
+
 {-# INLINE choosing #-}
 
--- | This is a 'R_Lens' that updates either side of an 'Either', where both sides have the same type.
+-- | This is a 'Lens' that updates either side of an 'Either', where both sides have the same type.
 --
 -- @
 -- 'chosen' ≡ 'choosing' 'id' 'id'
@@ -482,7 +515,7 @@ choosing _ r f (Right a') = Right <$> r f a'
 -- Right (a * b)
 --
 -- @
--- 'chosen' :: 'R_Lens' ('Either' a a) ('Either' b b) a b
+-- 'chosen' :: 'Lens' ('Either' a a) ('Either' b b) a b
 -- 'chosen' f ('Left' a)  = 'Left' '<$>' f a
 -- 'chosen' f ('Right' a) = 'Right' '<$>' f a
 -- @
@@ -492,7 +525,7 @@ chosen pafb = cotabulate $ \weaa -> cosieve (either id id `lmap` pafb) weaa <&> 
   Right _ -> Right b
 {-# INLINE chosen #-}
 
--- | 'alongside' makes a 'R_Lens' from two other lenses or a 'R_Getter' from two other getters
+-- | 'alongside' makes a 'Lens' from two other lenses or a 'Getter' from two other getters
 -- by executing them on their respective halves of a product.
 --
 -- >>> (Left a, Right b)^.alongside chosen chosen
@@ -502,239 +535,239 @@ chosen pafb = cotabulate $ \weaa -> cosieve (either id id `lmap` pafb) weaa <&> 
 -- (Left c,Right d)
 --
 -- @
--- 'alongside' :: 'R_Lens'   s t a b -> 'R_Lens'   s' t' a' b' -> 'R_Lens'   (s,s') (t,t') (a,a') (b,b')
--- 'alongside' :: 'R_Getter' s t a b -> 'R_Getter' s' t' a' b' -> 'R_Getter' (s,s') (t,t') (a,a') (b,b')
+-- 'alongside' :: 'Lens'   s t a b -> 'Lens'   s' t' a' b' -> 'Lens'   (s,s') (t,t') (a,a') (b,b')
+-- 'alongside' :: 'Getter' s t a b -> 'Getter' s' t' a' b' -> 'Getter' (s,s') (t,t') (a,a') (b,b')
 -- @
-alongside :: R_LensLike (AlongsideLeft f b') s  t  a  b
-          -> R_LensLike (AlongsideRight f t) s' t' a' b'
-          -> R_LensLike f (s, s') (t, t') (a, a') (b, b')
-alongside l1 l2 f (a1, a2)
-  = getAlongsideRight $ l2 ?? a2 $ \b2 -> AlongsideRight
-  $ getAlongsideLeft  $ l1 ?? a1 $ \b1 -> AlongsideLeft
+alongside :: LensLike (AlongsideLeft f b') s  t  a  b
+          -> LensLike (AlongsideRight f t) s' t' a' b'
+          -> LensLike f (s, s') (t, t') (a, a') (b, b')
+alongside l1 l2 = Optic $ \f (a1, a2) ->
+  getAlongsideRight $ runOptic l2 ?? a2 $ \b2 -> AlongsideRight
+  $ getAlongsideLeft  $ runOptic l1 ?? a1 $ \b1 -> AlongsideLeft
   $ f (b1,b2)
 {-# INLINE alongside #-}
 
--- | This 'R_Lens' lets you 'view' the current 'pos' of any indexed
+-- | This 'Lens' lets you 'view' the current 'pos' of any indexed
 -- store comonad and 'seek' to a new position. This reduces the API
--- for working these instances to a single 'R_Lens'.
+-- for working these instances to a single 'Lens'.
 --
 -- @
--- 'ipos' w ≡ w 'Control.R_Lens.R_Getter.^.' 'locus'
--- 'iseek' s w ≡ w '&' 'locus' 'Control.R_Lens.R_Setter..~' s
--- 'iseeks' f w ≡ w '&' 'locus' 'Control.R_Lens.R_Setter.%~' f
+-- 'ipos' w ≡ w 'Control.Lens.Getter.^.' 'locus'
+-- 'iseek' s w ≡ w '&' 'locus' 'Control.Lens.Setter..~' s
+-- 'iseeks' f w ≡ w '&' 'locus' 'Control.Lens.Setter.%~' f
 -- @
 --
 -- @
--- 'locus' :: 'R_Lens'' ('Context'' a s) a
--- 'locus' :: 'Conjoined' p => 'R_Lens'' ('Pretext'' p a s) a
--- 'locus' :: 'Conjoined' p => 'R_Lens'' ('PretextT'' p g a s) a
+-- 'locus' :: 'Lens'' ('Context'' a s) a
+-- 'locus' :: 'Conjoined' p => 'Lens'' ('Pretext'' p a s) a
+-- 'locus' :: 'Conjoined' p => 'Lens'' ('PretextT'' p g a s) a
 -- @
-locus :: IndexedComonadStore p => R_Lens (p a c s) (p b c s) a b
-locus f w = (`iseek` w) <$> f (ipos w)
+locus :: IndexedComonadStore p => Lens (p a c s) (p b c s) a b
+locus = Optic $ \f w -> (`iseek` w) <$> f (ipos w)
 {-# INLINE locus #-}
 
 -------------------------------------------------------------------------------
--- Cloning R_Lenses
+-- Cloning Lenses
 -------------------------------------------------------------------------------
 
--- | Cloning a 'R_Lens' is one way to make sure you aren't given
--- something weaker, such as a 'Control.R_Lens.R_Traversal.R_Traversal' and can be
+-- | Cloning a 'Lens' is one way to make sure you aren't given
+-- something weaker, such as a 'Control.Lens.Traversal.Traversal' and can be
 -- used as a way to pass around lenses that have to be monomorphic in @f@.
 --
--- Note: This only accepts a proper 'R_Lens'.
+-- Note: This only accepts a proper 'Lens'.
 --
--- >>> let example l x = set (cloneR_Lens l) (x^.cloneR_Lens l + 1) x in example _2 ("hello",1,"you")
+-- >>> let example l x = set (cloneLens l) (x^.cloneLens l + 1) x in example _2 ("hello",1,"you")
 -- ("hello",2,"you")
-cloneR_Lens :: R_ALens s t a b -> R_Lens s t a b
-cloneR_Lens l afb s = runPretext (l sell s) afb
-{-# INLINE cloneR_Lens #-}
+cloneLens :: ALens s t a b -> Lens s t a b
+cloneLens l = mkLens (\afb s -> runPretext (runOptic l sell s) afb)
+{-# INLINE cloneLens #-}
 
--- | Clone a 'R_Lens' as an 'IndexedPreservingR_Lens' that just passes through whatever
--- index is on any 'R_IndexedLens', 'R_IndexedFold', 'R_IndexedGetter' or  'R_IndexedTraversal' it is composed with.
+-- | Clone a 'Lens' as an 'IndexedPreservingLens' that just passes through whatever
+-- index is on any 'IndexedLens', 'IndexedFold', 'IndexedGetter' or  'IndexedTraversal' it is composed with.
 cloneR_IndexPreservingLens :: R_ALens s t a b -> R_IndexPreservingLens s t a b
 cloneR_IndexPreservingLens l pafb = cotabulate $ \ws -> runPretext (l sell (extract ws)) $ \a -> cosieve pafb (a <$ ws)
 {-# INLINE cloneR_IndexPreservingLens #-}
 
--- | Clone an 'R_IndexedLens' as an 'R_IndexedLens' with the same index.
-cloneR_IndexedLens :: R_AnIndexedLens i s t a b -> R_IndexedLens i s t a b
-cloneR_IndexedLens l f s = runPretext (l sell s) (Indexed (indexed f))
-{-# INLINE cloneR_IndexedLens #-}
+-- | Clone an 'IndexedLens' as an 'IndexedLens' with the same index.
+cloneIndexedLens :: AnIndexedLens i s t a b -> IndexedLens i s t a b
+cloneIndexedLens l = mkIndexedLens (\f s -> runPretext (runOptic l sell s) (Indexed (indexed f)))
+{-# INLINE cloneIndexedLens #-}
 
 -------------------------------------------------------------------------------
 -- Setting and Remembering
 -------------------------------------------------------------------------------
 
--- | Modify the target of a 'R_Lens' and return the result.
+-- | Modify the target of a 'Lens' and return the result.
 --
--- When you do not need the result of the operation, ('Control.R_Lens.R_Setter.%~') is more flexible.
+-- When you do not need the result of the operation, ('Control.Lens.Setter.%~') is more flexible.
 --
 -- @
--- ('<%~') ::             'R_Lens' s t a b      -> (a -> b) -> s -> (b, t)
--- ('<%~') ::             'Control.R_Lens.R_Iso.R_Iso' s t a b       -> (a -> b) -> s -> (b, t)
--- ('<%~') :: 'Monoid' b => 'Control.R_Lens.R_Traversal.R_Traversal' s t a b -> (a -> b) -> s -> (b, t)
+-- ('<%~') ::             'Lens' s t a b      -> (a -> b) -> s -> (b, t)
+-- ('<%~') ::             'Control.Lens.Iso.Iso' s t a b       -> (a -> b) -> s -> (b, t)
+-- ('<%~') :: 'Monoid' b => 'Control.Lens.Traversal.Traversal' s t a b -> (a -> b) -> s -> (b, t)
 -- @
-(<%~) :: R_LensLike ((,) b) s t a b -> (a -> b) -> s -> (b, t)
-l <%~ f = l $ (\t -> (t, t)) . f
+(<%~) :: AsLensLike ((,) b) k => Optic k s t a b -> (a -> b) -> s -> (b, t)
+l <%~ f = runLensLike l $ (\t -> (t, t)) . f
 {-# INLINE (<%~) #-}
 
--- | Increment the target of a numerically valued 'R_Lens' and return the result.
+-- | Increment the target of a numerically valued 'Lens' and return the result.
 --
--- When you do not need the result of the addition, ('Control.R_Lens.R_Setter.+~') is more flexible.
+-- When you do not need the result of the addition, ('Control.Lens.Setter.+~') is more flexible.
 --
 -- @
--- ('<+~') :: 'Num' a => 'R_Lens'' s a -> a -> s -> (a, s)
--- ('<+~') :: 'Num' a => 'Control.R_Lens.R_Iso.R_Iso'' s a  -> a -> s -> (a, s)
+-- ('<+~') :: 'Num' a => 'Lens'' s a -> a -> s -> (a, s)
+-- ('<+~') :: 'Num' a => 'Control.Lens.Iso.Iso'' s a  -> a -> s -> (a, s)
 -- @
-(<+~) :: Num a => R_LensLike ((,)a) s t a a -> a -> s -> (a, t)
+(<+~) :: (Num a, AsLensLike ((,) a) k) => Optic k s t a a -> a -> s -> (a, t)
 l <+~ a = l <%~ (+ a)
 {-# INLINE (<+~) #-}
 
--- | Decrement the target of a numerically valued 'R_Lens' and return the result.
+-- | Decrement the target of a numerically valued 'Lens' and return the result.
 --
--- When you do not need the result of the subtraction, ('Control.R_Lens.R_Setter.-~') is more flexible.
+-- When you do not need the result of the subtraction, ('Control.Lens.Setter.-~') is more flexible.
 --
 -- @
--- ('<-~') :: 'Num' a => 'R_Lens'' s a -> a -> s -> (a, s)
--- ('<-~') :: 'Num' a => 'Control.R_Lens.R_Iso.R_Iso'' s a  -> a -> s -> (a, s)
+-- ('<-~') :: 'Num' a => 'Lens'' s a -> a -> s -> (a, s)
+-- ('<-~') :: 'Num' a => 'Control.Lens.Iso.Iso'' s a  -> a -> s -> (a, s)
 -- @
-(<-~) :: Num a => R_LensLike ((,)a) s t a a -> a -> s -> (a, t)
+(<-~) :: (Num a, AsLensLike ((,) a) k) => Optic k s t a a -> a -> s -> (a, t)
 l <-~ a = l <%~ subtract a
 {-# INLINE (<-~) #-}
 
--- | Multiply the target of a numerically valued 'R_Lens' and return the result.
+-- | Multiply the target of a numerically valued 'Lens' and return the result.
 --
--- When you do not need the result of the multiplication, ('Control.R_Lens.R_Setter.*~') is more
+-- When you do not need the result of the multiplication, ('Control.Lens.Setter.*~') is more
 -- flexible.
 --
 -- @
--- ('<*~') :: 'Num' a => 'R_Lens'' s a -> a -> s -> (a, s)
--- ('<*~') :: 'Num' a => 'Control.R_Lens.R_Iso.R_Iso''  s a -> a -> s -> (a, s)
+-- ('<*~') :: 'Num' a => 'Lens'' s a -> a -> s -> (a, s)
+-- ('<*~') :: 'Num' a => 'Control.Lens.Iso.Iso''  s a -> a -> s -> (a, s)
 -- @
-(<*~) :: Num a => R_LensLike ((,)a) s t a a -> a -> s -> (a, t)
+(<*~) :: (Num a, AsLensLike ((,) a) k) => Optic k s t a a -> a -> s -> (a, t)
 l <*~ a = l <%~ (* a)
 {-# INLINE (<*~) #-}
 
--- | Divide the target of a fractionally valued 'R_Lens' and return the result.
+-- | Divide the target of a fractionally valued 'Lens' and return the result.
 --
--- When you do not need the result of the division, ('Control.R_Lens.R_Setter.//~') is more flexible.
+-- When you do not need the result of the division, ('Control.Lens.Setter.//~') is more flexible.
 --
 -- @
--- ('<//~') :: 'Fractional' a => 'R_Lens'' s a -> a -> s -> (a, s)
--- ('<//~') :: 'Fractional' a => 'Control.R_Lens.R_Iso.R_Iso''  s a -> a -> s -> (a, s)
+-- ('<//~') :: 'Fractional' a => 'Lens'' s a -> a -> s -> (a, s)
+-- ('<//~') :: 'Fractional' a => 'Control.Lens.Iso.Iso''  s a -> a -> s -> (a, s)
 -- @
-(<//~) :: Fractional a => R_LensLike ((,)a) s t a a -> a -> s -> (a, t)
+(<//~) :: Fractional a => LensLike ((,) a) s t a a -> a -> s -> (a, t)
 l <//~ a = l <%~ (/ a)
 {-# INLINE (<//~) #-}
 
--- | Raise the target of a numerically valued 'R_Lens' to a non-negative
+-- | Raise the target of a numerically valued 'Lens' to a non-negative
 -- 'Integral' power and return the result.
 --
--- When you do not need the result of the operation, ('Control.R_Lens.R_Setter.^~') is more flexible.
+-- When you do not need the result of the operation, ('Control.Lens.Setter.^~') is more flexible.
 --
 -- @
--- ('<^~') :: ('Num' a, 'Integral' e) => 'R_Lens'' s a -> e -> s -> (a, s)
--- ('<^~') :: ('Num' a, 'Integral' e) => 'Control.R_Lens.R_Iso.R_Iso'' s a -> e -> s -> (a, s)
+-- ('<^~') :: ('Num' a, 'Integral' e) => 'Lens'' s a -> e -> s -> (a, s)
+-- ('<^~') :: ('Num' a, 'Integral' e) => 'Control.Lens.Iso.Iso'' s a -> e -> s -> (a, s)
 -- @
-(<^~) :: (Num a, Integral e) => R_LensLike ((,)a) s t a a -> e -> s -> (a, t)
+(<^~) :: (Num a, Integral e) => LensLike ((,) a) s t a a -> e -> s -> (a, t)
 l <^~ e = l <%~ (^ e)
 {-# INLINE (<^~) #-}
 
--- | Raise the target of a fractionally valued 'R_Lens' to an 'Integral' power
+-- | Raise the target of a fractionally valued 'Lens' to an 'Integral' power
 -- and return the result.
 --
--- When you do not need the result of the operation, ('Control.R_Lens.R_Setter.^^~') is more flexible.
+-- When you do not need the result of the operation, ('Control.Lens.Setter.^^~') is more flexible.
 --
 -- @
--- ('<^^~') :: ('Fractional' a, 'Integral' e) => 'R_Lens'' s a -> e -> s -> (a, s)
--- ('<^^~') :: ('Fractional' a, 'Integral' e) => 'Control.R_Lens.R_Iso.R_Iso'' s a -> e -> s -> (a, s)
+-- ('<^^~') :: ('Fractional' a, 'Integral' e) => 'Lens'' s a -> e -> s -> (a, s)
+-- ('<^^~') :: ('Fractional' a, 'Integral' e) => 'Control.Lens.Iso.Iso'' s a -> e -> s -> (a, s)
 -- @
-(<^^~) :: (Fractional a, Integral e) => R_LensLike ((,)a) s t a a -> e -> s -> (a, t)
+(<^^~) :: (Fractional a, Integral e) => LensLike ((,) a) s t a a -> e -> s -> (a, t)
 l <^^~ e = l <%~ (^^ e)
 {-# INLINE (<^^~) #-}
 
--- | Raise the target of a floating-point valued 'R_Lens' to an arbitrary power
+-- | Raise the target of a floating-point valued 'Lens' to an arbitrary power
 -- and return the result.
 --
--- When you do not need the result of the operation, ('Control.R_Lens.R_Setter.**~') is more flexible.
+-- When you do not need the result of the operation, ('Control.Lens.Setter.**~') is more flexible.
 --
 -- @
--- ('<**~') :: 'Floating' a => 'R_Lens'' s a -> a -> s -> (a, s)
--- ('<**~') :: 'Floating' a => 'Control.R_Lens.R_Iso.R_Iso'' s a  -> a -> s -> (a, s)
+-- ('<**~') :: 'Floating' a => 'Lens'' s a -> a -> s -> (a, s)
+-- ('<**~') :: 'Floating' a => 'Control.Lens.Iso.Iso'' s a  -> a -> s -> (a, s)
 -- @
-(<**~) :: Floating a => R_LensLike ((,)a) s t a a -> a -> s -> (a, t)
+(<**~) :: Floating a => LensLike ((,) a) s t a a -> a -> s -> (a, t)
 l <**~ a = l <%~ (** a)
 {-# INLINE (<**~) #-}
 
--- | Logically '||' a Boolean valued 'R_Lens' and return the result.
+-- | Logically '||' a Boolean valued 'Lens' and return the result.
 --
--- When you do not need the result of the operation, ('Control.R_Lens.R_Setter.||~') is more flexible.
+-- When you do not need the result of the operation, ('Control.Lens.Setter.||~') is more flexible.
 --
 -- @
--- ('<||~') :: 'R_Lens'' s 'Bool' -> 'Bool' -> s -> ('Bool', s)
--- ('<||~') :: 'Control.R_Lens.R_Iso.R_Iso'' s 'Bool'  -> 'Bool' -> s -> ('Bool', s)
+-- ('<||~') :: 'Lens'' s 'Bool' -> 'Bool' -> s -> ('Bool', s)
+-- ('<||~') :: 'Control.Lens.Iso.Iso'' s 'Bool'  -> 'Bool' -> s -> ('Bool', s)
 -- @
-(<||~) :: R_LensLike ((,)Bool) s t Bool Bool -> Bool -> s -> (Bool, t)
+(<||~) :: AsLensLike ((,) Bool) k => Optic k s t Bool Bool -> Bool -> s -> (Bool, t)
 l <||~ b = l <%~ (|| b)
 {-# INLINE (<||~) #-}
 
--- | Logically '&&' a Boolean valued 'R_Lens' and return the result.
+-- | Logically '&&' a Boolean valued 'Lens' and return the result.
 --
--- When you do not need the result of the operation, ('Control.R_Lens.R_Setter.&&~') is more flexible.
+-- When you do not need the result of the operation, ('Control.Lens.Setter.&&~') is more flexible.
 --
 -- @
--- ('<&&~') :: 'R_Lens'' s 'Bool' -> 'Bool' -> s -> ('Bool', s)
--- ('<&&~') :: 'Control.R_Lens.R_Iso.R_Iso'' s 'Bool'  -> 'Bool' -> s -> ('Bool', s)
+-- ('<&&~') :: 'Lens'' s 'Bool' -> 'Bool' -> s -> ('Bool', s)
+-- ('<&&~') :: 'Control.Lens.Iso.Iso'' s 'Bool'  -> 'Bool' -> s -> ('Bool', s)
 -- @
-(<&&~) :: R_LensLike ((,)Bool) s t Bool Bool -> Bool -> s -> (Bool, t)
+(<&&~) :: AsLensLike ((,)Bool) k => Optic k s t Bool Bool -> Bool -> s -> (Bool, t)
 l <&&~ b = l <%~ (&& b)
 {-# INLINE (<&&~) #-}
 
--- | Modify the target of a 'R_Lens', but return the old value.
+-- | Modify the target of a 'Lens', but return the old value.
 --
--- When you do not need the old value, ('Control.R_Lens.R_Setter.%~') is more flexible.
+-- When you do not need the old value, ('Control.Lens.Setter.%~') is more flexible.
 --
 -- @
--- ('<<%~') ::             'R_Lens' s t a b      -> (a -> b) -> s -> (a, t)
--- ('<<%~') ::             'Control.R_Lens.R_Iso.R_Iso' s t a b       -> (a -> b) -> s -> (a, t)
--- ('<<%~') :: 'Monoid' a => 'Control.R_Lens.R_Traversal.R_Traversal' s t a b -> (a -> b) -> s -> (a, t)
+-- ('<<%~') ::             'Lens' s t a b      -> (a -> b) -> s -> (a, t)
+-- ('<<%~') ::             'Control.Lens.Iso.Iso' s t a b       -> (a -> b) -> s -> (a, t)
+-- ('<<%~') :: 'Monoid' a => 'Control.Lens.Traversal.Traversal' s t a b -> (a -> b) -> s -> (a, t)
 -- @
-(<<%~) :: R_LensLike ((,)a) s t a b -> (a -> b) -> s -> (a, t)
-(<<%~) l = l . lmap (\a -> (a, a)) . second'
+(<<%~) :: AsLensLike ((,) a) k => Optic k s t a b -> (a -> b) -> s -> (a, t)
+(<<%~) l = runLensLike l . lmap (\a -> (a, a)) . second'
 {-# INLINE (<<%~) #-}
 
--- | Replace the target of a 'R_Lens', but return the old value.
+-- | Replace the target of a 'Lens', but return the old value.
 --
--- When you do not need the old value, ('Control.R_Lens.R_Setter..~') is more flexible.
+-- When you do not need the old value, ('Control.Lens.Setter..~') is more flexible.
 --
 -- @
--- ('<<.~') ::             'R_Lens' s t a b      -> b -> s -> (a, t)
--- ('<<.~') ::             'Control.R_Lens.R_Iso.R_Iso' s t a b       -> b -> s -> (a, t)
--- ('<<.~') :: 'Monoid' a => 'Control.R_Lens.R_Traversal.R_Traversal' s t a b -> b -> s -> (a, t)
+-- ('<<.~') ::             'Lens' s t a b      -> b -> s -> (a, t)
+-- ('<<.~') ::             'Control.Lens.Iso.Iso' s t a b       -> b -> s -> (a, t)
+-- ('<<.~') :: 'Monoid' a => 'Control.Lens.Traversal.Traversal' s t a b -> b -> s -> (a, t)
 -- @
-(<<.~) :: R_LensLike ((,)a) s t a b -> b -> s -> (a, t)
-l <<.~ b = l $ \a -> (a, b)
+(<<.~) :: AsLensLike ((,) a) k => Optic k s t a b -> b -> s -> (a, t)
+l <<.~ b = runLensLike l $ \a -> (a, b)
 {-# INLINE (<<.~) #-}
 
--- | Replace the target of a 'R_Lens' with a 'Just' value, but return the old value.
+-- | Replace the target of a 'Lens' with a 'Just' value, but return the old value.
 --
--- If you do not need the old value ('Control.R_Lens.R_Setter.?~') is more flexible.
+-- If you do not need the old value ('Control.Lens.Setter.?~') is more flexible.
 --
 -- >>> import Data.Map as Map
 -- >>> _2.at "hello" <<?~ "world" $ (42,Map.fromList [("goodnight","gracie")])
 -- (Nothing,(42,fromList [("goodnight","gracie"),("hello","world")]))
 --
 -- @
--- ('<<?~') :: 'R_Iso' s t a ('Maybe' b)       -> b -> s -> (a, t)
--- ('<<?~') :: 'R_Lens' s t a ('Maybe' b)      -> b -> s -> (a, t)
--- ('<<?~') :: 'R_Traversal' s t a ('Maybe' b) -> b -> s -> (a, t)
+-- ('<<?~') :: 'Iso' s t a ('Maybe' b)       -> b -> s -> (a, t)
+-- ('<<?~') :: 'Lens' s t a ('Maybe' b)      -> b -> s -> (a, t)
+-- ('<<?~') :: 'Traversal' s t a ('Maybe' b) -> b -> s -> (a, t)
 -- @
-(<<?~) :: R_LensLike ((,)a) s t a (Maybe b) -> b -> s -> (a, t)
+(<<?~) :: AsLensLike ((,) a) k => Optic k s t a (Maybe b) -> b -> s -> (a, t)
 l <<?~ b = l <<.~ Just b
 {-# INLINE (<<?~) #-}
 
--- | Increment the target of a numerically valued 'R_Lens' and return the old value.
+-- | Increment the target of a numerically valued 'Lens' and return the old value.
 --
--- When you do not need the old value, ('Control.R_Lens.R_Setter.+~') is more flexible.
+-- When you do not need the old value, ('Control.Lens.Setter.+~') is more flexible.
 --
 -- >>> (a,b) & _1 <<+~ c
 -- (a,(a + c,b))
@@ -743,16 +776,16 @@ l <<?~ b = l <<.~ Just b
 -- (b,(a,b + c))
 --
 -- @
--- ('<<+~') :: 'Num' a => 'R_Lens'' s a -> a -> s -> (a, s)
--- ('<<+~') :: 'Num' a => 'R_Iso'' s a -> a -> s -> (a, s)
+-- ('<<+~') :: 'Num' a => 'Lens'' s a -> a -> s -> (a, s)
+-- ('<<+~') :: 'Num' a => 'Iso'' s a -> a -> s -> (a, s)
 -- @
-(<<+~) :: Num a => R_LensLike' ((,) a) s a -> a -> s -> (a, s)
-l <<+~ b = l $ \a -> (a, a + b)
+(<<+~) :: (Num a, AsLensLike ((,) a) k) => Optic' k s a -> a -> s -> (a, s)
+l <<+~ b = runLensLike l $ \a -> (a, a + b)
 {-# INLINE (<<+~) #-}
 
--- | Decrement the target of a numerically valued 'R_Lens' and return the old value.
+-- | Decrement the target of a numerically valued 'Lens' and return the old value.
 --
--- When you do not need the old value, ('Control.R_Lens.R_Setter.-~') is more flexible.
+-- When you do not need the old value, ('Control.Lens.Setter.-~') is more flexible.
 --
 -- >>> (a,b) & _1 <<-~ c
 -- (a,(a - c,b))
@@ -761,16 +794,16 @@ l <<+~ b = l $ \a -> (a, a + b)
 -- (b,(a,b - c))
 --
 -- @
--- ('<<-~') :: 'Num' a => 'R_Lens'' s a -> a -> s -> (a, s)
--- ('<<-~') :: 'Num' a => 'R_Iso'' s a -> a -> s -> (a, s)
+-- ('<<-~') :: 'Num' a => 'Lens'' s a -> a -> s -> (a, s)
+-- ('<<-~') :: 'Num' a => 'Iso'' s a -> a -> s -> (a, s)
 -- @
-(<<-~) :: Num a => R_LensLike' ((,) a) s a -> a -> s -> (a, s)
-l <<-~ b = l $ \a -> (a, a - b)
+(<<-~) :: (Num a, AsLensLike ((,) a) k) => Optic' k s a -> a -> s -> (a, s)
+l <<-~ b = runLensLike l $ \a -> (a, a - b)
 {-# INLINE (<<-~) #-}
 
--- | Multiply the target of a numerically valued 'R_Lens' and return the old value.
+-- | Multiply the target of a numerically valued 'Lens' and return the old value.
 --
--- When you do not need the old value, ('Control.R_Lens.R_Setter.-~') is more flexible.
+-- When you do not need the old value, ('Control.Lens.Setter.-~') is more flexible.
 --
 -- >>> (a,b) & _1 <<*~ c
 -- (a,(a * c,b))
@@ -779,16 +812,16 @@ l <<-~ b = l $ \a -> (a, a - b)
 -- (b,(a,b * c))
 --
 -- @
--- ('<<*~') :: 'Num' a => 'R_Lens'' s a -> a -> s -> (a, s)
--- ('<<*~') :: 'Num' a => 'R_Iso'' s a -> a -> s -> (a, s)
+-- ('<<*~') :: 'Num' a => 'Lens'' s a -> a -> s -> (a, s)
+-- ('<<*~') :: 'Num' a => 'Iso'' s a -> a -> s -> (a, s)
 -- @
-(<<*~) :: Num a => R_LensLike' ((,) a) s a -> a -> s -> (a, s)
-l <<*~ b = l $ \a -> (a, a * b)
+(<<*~) :: (Num a, AsLensLike ((,) a) k) => Optic' k s a -> a -> s -> (a, s)
+l <<*~ b = runLensLike l $ \a -> (a, a * b)
 {-# INLINE (<<*~) #-}
 
--- | Divide the target of a numerically valued 'R_Lens' and return the old value.
+-- | Divide the target of a numerically valued 'Lens' and return the old value.
 --
--- When you do not need the old value, ('Control.R_Lens.R_Setter.//~') is more flexible.
+-- When you do not need the old value, ('Control.Lens.Setter.//~') is more flexible.
 --
 -- >>> (a,b) & _1 <<//~ c
 -- (a,(a / c,b))
@@ -797,40 +830,40 @@ l <<*~ b = l $ \a -> (a, a * b)
 -- (10.0,("Hawaii",5.0))
 --
 -- @
--- ('<<//~') :: Fractional a => 'R_Lens'' s a -> a -> s -> (a, s)
--- ('<<//~') :: Fractional a => 'R_Iso'' s a -> a -> s -> (a, s)
+-- ('<<//~') :: Fractional a => 'Lens'' s a -> a -> s -> (a, s)
+-- ('<<//~') :: Fractional a => 'Iso'' s a -> a -> s -> (a, s)
 -- @
-(<<//~) :: Fractional a => R_LensLike' ((,) a) s a -> a -> s -> (a, s)
-l <<//~ b = l $ \a -> (a, a / b)
+(<<//~) :: (Fractional a, AsLensLike ((,) a) k) => Optic' k s a -> a -> s -> (a, s)
+l <<//~ b = runLensLike l $ \a -> (a, a / b)
 {-# INLINE (<<//~) #-}
 
--- | Raise the target of a numerically valued 'R_Lens' to a non-negative power and return the old value.
+-- | Raise the target of a numerically valued 'Lens' to a non-negative power and return the old value.
 --
--- When you do not need the old value, ('Control.R_Lens.R_Setter.^~') is more flexible.
+-- When you do not need the old value, ('Control.Lens.Setter.^~') is more flexible.
 --
 -- @
--- ('<<^~') :: ('Num' a, 'Integral' e) => 'R_Lens'' s a -> e -> s -> (a, s)
--- ('<<^~') :: ('Num' a, 'Integral' e) => 'R_Iso'' s a -> e -> s -> (a, s)
+-- ('<<^~') :: ('Num' a, 'Integral' e) => 'Lens'' s a -> e -> s -> (a, s)
+-- ('<<^~') :: ('Num' a, 'Integral' e) => 'Iso'' s a -> e -> s -> (a, s)
 -- @
-(<<^~) :: (Num a, Integral e) => R_LensLike' ((,) a) s a -> e -> s -> (a, s)
-l <<^~ e = l $ \a -> (a, a ^ e)
+(<<^~) :: (Num a, Integral e, AsLensLike ((,) a) k) => Optic' k s a -> e -> s -> (a, s)
+l <<^~ e = runLensLike l $ \a -> (a, a ^ e)
 {-# INLINE (<<^~) #-}
 
--- | Raise the target of a fractionally valued 'R_Lens' to an integral power and return the old value.
+-- | Raise the target of a fractionally valued 'Lens' to an integral power and return the old value.
 --
--- When you do not need the old value, ('Control.R_Lens.R_Setter.^^~') is more flexible.
+-- When you do not need the old value, ('Control.Lens.Setter.^^~') is more flexible.
 --
 -- @
--- ('<<^^~') :: ('Fractional' a, 'Integral' e) => 'R_Lens'' s a -> e -> s -> (a, s)
--- ('<<^^~') :: ('Fractional' a, 'Integral' e) => 'R_Iso'' s a -> e -> S -> (a, s)
+-- ('<<^^~') :: ('Fractional' a, 'Integral' e) => 'Lens'' s a -> e -> s -> (a, s)
+-- ('<<^^~') :: ('Fractional' a, 'Integral' e) => 'Iso'' s a -> e -> S -> (a, s)
 -- @
-(<<^^~) :: (Fractional a, Integral e) => R_LensLike' ((,) a) s a -> e -> s -> (a, s)
-l <<^^~ e = l $ \a -> (a, a ^^ e)
+(<<^^~) :: (Fractional a, Integral e, AsLensLike ((,) a) k) => Optic' k s a -> e -> s -> (a, s)
+l <<^^~ e = runLensLike l $ \a -> (a, a ^^ e)
 {-# INLINE (<<^^~) #-}
 
--- | Raise the target of a floating-point valued 'R_Lens' to an arbitrary power and return the old value.
+-- | Raise the target of a floating-point valued 'Lens' to an arbitrary power and return the old value.
 --
--- When you do not need the old value, ('Control.R_Lens.R_Setter.**~') is more flexible.
+-- When you do not need the old value, ('Control.Lens.Setter.**~') is more flexible.
 --
 -- >>> (a,b) & _1 <<**~ c
 -- (a,(a**c,b))
@@ -839,16 +872,16 @@ l <<^^~ e = l $ \a -> (a, a ^^ e)
 -- (b,(a,b**c))
 --
 -- @
--- ('<<**~') :: 'Floating' a => 'R_Lens'' s a -> a -> s -> (a, s)
--- ('<<**~') :: 'Floating' a => 'R_Iso'' s a -> a -> s -> (a, s)
+-- ('<<**~') :: 'Floating' a => 'Lens'' s a -> a -> s -> (a, s)
+-- ('<<**~') :: 'Floating' a => 'Iso'' s a -> a -> s -> (a, s)
 -- @
-(<<**~) :: Floating a => R_LensLike' ((,) a) s a -> a -> s -> (a, s)
-l <<**~ e = l $ \a -> (a, a ** e)
+(<<**~) :: (Floating a, AsLensLike ((,) a) k) => Optic' k s a -> a -> s -> (a, s)
+l <<**~ e = runLensLike l $ \a -> (a, a ** e)
 {-# INLINE (<<**~) #-}
 
--- | Logically '||' the target of a 'Bool'-valued 'R_Lens' and return the old value.
+-- | Logically '||' the target of a 'Bool'-valued 'Lens' and return the old value.
 --
--- When you do not need the old value, ('Control.R_Lens.R_Setter.||~') is more flexible.
+-- When you do not need the old value, ('Control.Lens.Setter.||~') is more flexible.
 --
 -- >>> (False,6) & _1 <<||~ True
 -- (False,(True,6))
@@ -857,16 +890,16 @@ l <<**~ e = l $ \a -> (a, a ** e)
 -- (True,("hello",True))
 --
 -- @
--- ('<<||~') :: 'R_Lens'' s 'Bool' -> 'Bool' -> s -> ('Bool', s)
--- ('<<||~') :: 'R_Iso'' s 'Bool' -> 'Bool' -> s -> ('Bool', s)
+-- ('<<||~') :: 'Lens'' s 'Bool' -> 'Bool' -> s -> ('Bool', s)
+-- ('<<||~') :: 'Iso'' s 'Bool' -> 'Bool' -> s -> ('Bool', s)
 -- @
-(<<||~) :: R_LensLike' ((,) Bool) s Bool -> Bool -> s -> (Bool, s)
-l <<||~ b = l $ \a -> (a, b || a)
+(<<||~) :: AsLensLike ((,) Bool) k => Optic' k s Bool -> Bool -> s -> (Bool, s)
+l <<||~ b = runLensLike l $ \a -> (a, b || a)
 {-# INLINE (<<||~) #-}
 
--- | Logically '&&' the target of a 'Bool'-valued 'R_Lens' and return the old value.
+-- | Logically '&&' the target of a 'Bool'-valued 'Lens' and return the old value.
 --
--- When you do not need the old value, ('Control.R_Lens.R_Setter.&&~') is more flexible.
+-- When you do not need the old value, ('Control.Lens.Setter.&&~') is more flexible.
 --
 -- >>> (False,6) & _1 <<&&~ True
 -- (False,(False,6))
@@ -875,16 +908,16 @@ l <<||~ b = l $ \a -> (a, b || a)
 -- (True,("hello",False))
 --
 -- @
--- ('<<&&~') :: 'R_Lens'' s Bool -> Bool -> s -> (Bool, s)
--- ('<<&&~') :: 'R_Iso'' s Bool -> Bool -> s -> (Bool, s)
+-- ('<<&&~') :: 'Lens'' s Bool -> Bool -> s -> (Bool, s)
+-- ('<<&&~') :: 'Iso'' s Bool -> Bool -> s -> (Bool, s)
 -- @
-(<<&&~) :: R_LensLike' ((,) Bool) s Bool -> Bool -> s -> (Bool, s)
-l <<&&~ b = l $ \a -> (a, b && a)
+(<<&&~) :: AsLensLike ((,) Bool) k => Optic' k s Bool -> Bool -> s -> (Bool, s)
+l <<&&~ b = runLensLike l $ \a -> (a, b && a)
 {-# INLINE (<<&&~) #-}
 
--- | Modify the target of a monoidally valued 'R_Lens' by 'mappend'ing a new value and return the old value.
+-- | Modify the target of a monoidally valued 'Lens' by 'mappend'ing a new value and return the old value.
 --
--- When you do not need the old value, ('Control.R_Lens.R_Setter.<>~') is more flexible.
+-- When you do not need the old value, ('Control.Lens.Setter.<>~') is more flexible.
 --
 -- >>> (Sum a,b) & _1 <<<>~ Sum c
 -- (Sum {getSum = a},(Sum {getSum = a + c},b))
@@ -893,367 +926,367 @@ l <<&&~ b = l $ \a -> (a, b && a)
 -- ("Bond",("James","Bond, 007"))
 --
 -- @
--- ('<<<>~') :: 'Monoid' r => 'R_Lens'' s r -> r -> s -> (r, s)
--- ('<<<>~') :: 'Monoid' r => 'R_Iso'' s r -> r -> s -> (r, s)
+-- ('<<<>~') :: 'Monoid' r => 'Lens'' s r -> r -> s -> (r, s)
+-- ('<<<>~') :: 'Monoid' r => 'Iso'' s r -> r -> s -> (r, s)
 -- @
-(<<<>~) :: Monoid r => R_LensLike' ((,) r) s r -> r -> s -> (r, s)
-l <<<>~ b = l $ \a -> (a, a `mappend` b)
+(<<<>~) :: (Monoid r, AsLensLike ((,) r) k) => Optic' k s r -> r -> s -> (r, s)
+l <<<>~ b = runLensLike l $ \a -> (a, a `mappend` b)
 {-# INLINE (<<<>~) #-}
 
 -------------------------------------------------------------------------------
 -- Setting and Remembering State
 -------------------------------------------------------------------------------
 
--- | Modify the target of a 'R_Lens' into your 'Monad''s state by a user supplied
+-- | Modify the target of a 'Lens' into your 'Monad''s state by a user supplied
 -- function and return the result.
 --
--- When applied to a 'Control.R_Lens.R_Traversal.R_Traversal', it this will return a monoidal summary of all of the intermediate
+-- When applied to a 'Control.Lens.Traversal.Traversal', it this will return a monoidal summary of all of the intermediate
 -- results.
 --
--- When you do not need the result of the operation, ('Control.R_Lens.R_Setter.%=') is more flexible.
+-- When you do not need the result of the operation, ('Control.Lens.Setter.%=') is more flexible.
 --
 -- @
--- ('<%=') :: 'MonadState' s m             => 'R_Lens'' s a      -> (a -> a) -> m a
--- ('<%=') :: 'MonadState' s m             => 'Control.R_Lens.R_Iso.R_Iso'' s a       -> (a -> a) -> m a
--- ('<%=') :: ('MonadState' s m, 'Monoid' a) => 'Control.R_Lens.R_Traversal.R_Traversal'' s a -> (a -> a) -> m a
+-- ('<%=') :: 'MonadState' s m             => 'Lens'' s a      -> (a -> a) -> m a
+-- ('<%=') :: 'MonadState' s m             => 'Control.Lens.Iso.Iso'' s a       -> (a -> a) -> m a
+-- ('<%=') :: ('MonadState' s m, 'Monoid' a) => 'Control.Lens.Traversal.Traversal'' s a -> (a -> a) -> m a
 -- @
-(<%=) :: MonadState s m => R_LensLike ((,)b) s s a b -> (a -> b) -> m b
-l <%= f = l %%= (\b -> (b, b)) . f
+(<%=) :: forall s m k a b. (MonadState s m, AsLensLike ((,) b) k) => Optic k s s a b -> (a -> b) -> m b
+l <%= f = toLensLikePair l %%= (\b -> (b, b)) . f
 {-# INLINE (<%=) #-}
 
 
--- | Add to the target of a numerically valued 'R_Lens' into your 'Monad''s state
+-- | Add to the target of a numerically valued 'Lens' into your 'Monad''s state
 -- and return the result.
 --
--- When you do not need the result of the addition, ('Control.R_Lens.R_Setter.+=') is more
+-- When you do not need the result of the addition, ('Control.Lens.Setter.+=') is more
 -- flexible.
 --
 -- @
--- ('<+=') :: ('MonadState' s m, 'Num' a) => 'R_Lens'' s a -> a -> m a
--- ('<+=') :: ('MonadState' s m, 'Num' a) => 'Control.R_Lens.R_Iso.R_Iso'' s a -> a -> m a
+-- ('<+=') :: ('MonadState' s m, 'Num' a) => 'Lens'' s a -> a -> m a
+-- ('<+=') :: ('MonadState' s m, 'Num' a) => 'Control.Lens.Iso.Iso'' s a -> a -> m a
 -- @
-(<+=) :: (MonadState s m, Num a) => R_LensLike' ((,)a) s a -> a -> m a
+(<+=) :: (MonadState s m, Num a, AsLensLike ((,) a) k) => Optic' k s a -> a -> m a
 l <+= a = l <%= (+ a)
 {-# INLINE (<+=) #-}
 
--- | Subtract from the target of a numerically valued 'R_Lens' into your 'Monad''s
+-- | Subtract from the target of a numerically valued 'Lens' into your 'Monad''s
 -- state and return the result.
 --
--- When you do not need the result of the subtraction, ('Control.R_Lens.R_Setter.-=') is more
+-- When you do not need the result of the subtraction, ('Control.Lens.Setter.-=') is more
 -- flexible.
 --
 -- @
--- ('<-=') :: ('MonadState' s m, 'Num' a) => 'R_Lens'' s a -> a -> m a
--- ('<-=') :: ('MonadState' s m, 'Num' a) => 'Control.R_Lens.R_Iso.R_Iso'' s a -> a -> m a
+-- ('<-=') :: ('MonadState' s m, 'Num' a) => 'Lens'' s a -> a -> m a
+-- ('<-=') :: ('MonadState' s m, 'Num' a) => 'Control.Lens.Iso.Iso'' s a -> a -> m a
 -- @
-(<-=) :: (MonadState s m, Num a) => R_LensLike' ((,)a) s a -> a -> m a
+(<-=) :: (MonadState s m, Num a, AsLensLike ((,) a) k) => Optic' k s a -> a -> m a
 l <-= a = l <%= subtract a
 {-# INLINE (<-=) #-}
 
--- | Multiply the target of a numerically valued 'R_Lens' into your 'Monad''s
+-- | Multiply the target of a numerically valued 'Lens' into your 'Monad''s
 -- state and return the result.
 --
--- When you do not need the result of the multiplication, ('Control.R_Lens.R_Setter.*=') is more
+-- When you do not need the result of the multiplication, ('Control.Lens.Setter.*=') is more
 -- flexible.
 --
 -- @
--- ('<*=') :: ('MonadState' s m, 'Num' a) => 'R_Lens'' s a -> a -> m a
--- ('<*=') :: ('MonadState' s m, 'Num' a) => 'Control.R_Lens.R_Iso.R_Iso'' s a -> a -> m a
+-- ('<*=') :: ('MonadState' s m, 'Num' a) => 'Lens'' s a -> a -> m a
+-- ('<*=') :: ('MonadState' s m, 'Num' a) => 'Control.Lens.Iso.Iso'' s a -> a -> m a
 -- @
-(<*=) :: (MonadState s m, Num a) => R_LensLike' ((,)a) s a -> a -> m a
+(<*=) :: (MonadState s m, Num a, AsLensLike ((,) a) k) => Optic' k s a -> a -> m a
 l <*= a = l <%= (* a)
 {-# INLINE (<*=) #-}
 
--- | Divide the target of a fractionally valued 'R_Lens' into your 'Monad''s state
+-- | Divide the target of a fractionally valued 'Lens' into your 'Monad''s state
 -- and return the result.
 --
--- When you do not need the result of the division, ('Control.R_Lens.R_Setter.//=') is more flexible.
+-- When you do not need the result of the division, ('Control.Lens.Setter.//=') is more flexible.
 --
 -- @
--- ('<//=') :: ('MonadState' s m, 'Fractional' a) => 'R_Lens'' s a -> a -> m a
--- ('<//=') :: ('MonadState' s m, 'Fractional' a) => 'Control.R_Lens.R_Iso.R_Iso'' s a -> a -> m a
+-- ('<//=') :: ('MonadState' s m, 'Fractional' a) => 'Lens'' s a -> a -> m a
+-- ('<//=') :: ('MonadState' s m, 'Fractional' a) => 'Control.Lens.Iso.Iso'' s a -> a -> m a
 -- @
-(<//=) :: (MonadState s m, Fractional a) => R_LensLike' ((,)a) s a -> a -> m a
+(<//=) :: (MonadState s m, Fractional a, AsLensLike ((,) a) k) => Optic' k s a -> a -> m a
 l <//= a = l <%= (/ a)
 {-# INLINE (<//=) #-}
 
--- | Raise the target of a numerically valued 'R_Lens' into your 'Monad''s state
+-- | Raise the target of a numerically valued 'Lens' into your 'Monad''s state
 -- to a non-negative 'Integral' power and return the result.
 --
--- When you do not need the result of the operation, ('Control.R_Lens.R_Setter.^=') is more flexible.
+-- When you do not need the result of the operation, ('Control.Lens.Setter.^=') is more flexible.
 --
 -- @
--- ('<^=') :: ('MonadState' s m, 'Num' a, 'Integral' e) => 'R_Lens'' s a -> e -> m a
--- ('<^=') :: ('MonadState' s m, 'Num' a, 'Integral' e) => 'Control.R_Lens.R_Iso.R_Iso'' s a -> e -> m a
+-- ('<^=') :: ('MonadState' s m, 'Num' a, 'Integral' e) => 'Lens'' s a -> e -> m a
+-- ('<^=') :: ('MonadState' s m, 'Num' a, 'Integral' e) => 'Control.Lens.Iso.Iso'' s a -> e -> m a
 -- @
-(<^=) :: (MonadState s m, Num a, Integral e) => R_LensLike' ((,)a) s a -> e -> m a
+(<^=) :: (MonadState s m, Num a, Integral e, AsLensLike ((,) a) k) => Optic' k s a -> e -> m a
 l <^= e = l <%= (^ e)
 {-# INLINE (<^=) #-}
 
--- | Raise the target of a fractionally valued 'R_Lens' into your 'Monad''s state
+-- | Raise the target of a fractionally valued 'Lens' into your 'Monad''s state
 -- to an 'Integral' power and return the result.
 --
--- When you do not need the result of the operation, ('Control.R_Lens.R_Setter.^^=') is more flexible.
+-- When you do not need the result of the operation, ('Control.Lens.Setter.^^=') is more flexible.
 --
 -- @
--- ('<^^=') :: ('MonadState' s m, 'Fractional' b, 'Integral' e) => 'R_Lens'' s a -> e -> m a
--- ('<^^=') :: ('MonadState' s m, 'Fractional' b, 'Integral' e) => 'Control.R_Lens.R_Iso.R_Iso'' s a  -> e -> m a
+-- ('<^^=') :: ('MonadState' s m, 'Fractional' b, 'Integral' e) => 'Lens'' s a -> e -> m a
+-- ('<^^=') :: ('MonadState' s m, 'Fractional' b, 'Integral' e) => 'Control.Lens.Iso.Iso'' s a  -> e -> m a
 -- @
-(<^^=) :: (MonadState s m, Fractional a, Integral e) => R_LensLike' ((,)a) s a -> e -> m a
+(<^^=) :: (MonadState s m, Fractional a, Integral e, AsLensLike ((,) a) k) => Optic' k s a -> e -> m a
 l <^^= e = l <%= (^^ e)
 {-# INLINE (<^^=) #-}
 
--- | Raise the target of a floating-point valued 'R_Lens' into your 'Monad''s
+-- | Raise the target of a floating-point valued 'Lens' into your 'Monad''s
 -- state to an arbitrary power and return the result.
 --
--- When you do not need the result of the operation, ('Control.R_Lens.R_Setter.**=') is more flexible.
+-- When you do not need the result of the operation, ('Control.Lens.Setter.**=') is more flexible.
 --
 -- @
--- ('<**=') :: ('MonadState' s m, 'Floating' a) => 'R_Lens'' s a -> a -> m a
--- ('<**=') :: ('MonadState' s m, 'Floating' a) => 'Control.R_Lens.R_Iso.R_Iso'' s a -> a -> m a
+-- ('<**=') :: ('MonadState' s m, 'Floating' a) => 'Lens'' s a -> a -> m a
+-- ('<**=') :: ('MonadState' s m, 'Floating' a) => 'Control.Lens.Iso.Iso'' s a -> a -> m a
 -- @
-(<**=) :: (MonadState s m, Floating a) => R_LensLike' ((,)a) s a -> a -> m a
+(<**=) :: (MonadState s m, Floating a, AsLensLike ((,) a) k) => Optic' k s a -> a -> m a
 l <**= a = l <%= (** a)
 {-# INLINE (<**=) #-}
 
--- | Logically '||' a Boolean valued 'R_Lens' into your 'Monad''s state and return
+-- | Logically '||' a Boolean valued 'Lens' into your 'Monad''s state and return
 -- the result.
 --
--- When you do not need the result of the operation, ('Control.R_Lens.R_Setter.||=') is more flexible.
+-- When you do not need the result of the operation, ('Control.Lens.Setter.||=') is more flexible.
 --
 -- @
--- ('<||=') :: 'MonadState' s m => 'R_Lens'' s 'Bool' -> 'Bool' -> m 'Bool'
--- ('<||=') :: 'MonadState' s m => 'Control.R_Lens.R_Iso.R_Iso'' s 'Bool'  -> 'Bool' -> m 'Bool'
+-- ('<||=') :: 'MonadState' s m => 'Lens'' s 'Bool' -> 'Bool' -> m 'Bool'
+-- ('<||=') :: 'MonadState' s m => 'Control.Lens.Iso.Iso'' s 'Bool'  -> 'Bool' -> m 'Bool'
 -- @
-(<||=) :: MonadState s m => R_LensLike' ((,)Bool) s Bool -> Bool -> m Bool
+(<||=) :: (MonadState s m, AsLensLike ((,) Bool) k) => Optic' k s Bool -> Bool -> m Bool
 l <||= b = l <%= (|| b)
 {-# INLINE (<||=) #-}
 
--- | Logically '&&' a Boolean valued 'R_Lens' into your 'Monad''s state and return
+-- | Logically '&&' a Boolean valued 'Lens' into your 'Monad''s state and return
 -- the result.
 --
--- When you do not need the result of the operation, ('Control.R_Lens.R_Setter.&&=') is more flexible.
+-- When you do not need the result of the operation, ('Control.Lens.Setter.&&=') is more flexible.
 --
 -- @
--- ('<&&=') :: 'MonadState' s m => 'R_Lens'' s 'Bool' -> 'Bool' -> m 'Bool'
--- ('<&&=') :: 'MonadState' s m => 'Control.R_Lens.R_Iso.R_Iso'' s 'Bool'  -> 'Bool' -> m 'Bool'
+-- ('<&&=') :: 'MonadState' s m => 'Lens'' s 'Bool' -> 'Bool' -> m 'Bool'
+-- ('<&&=') :: 'MonadState' s m => 'Control.Lens.Iso.Iso'' s 'Bool'  -> 'Bool' -> m 'Bool'
 -- @
-(<&&=) :: MonadState s m => R_LensLike' ((,)Bool) s Bool -> Bool -> m Bool
+(<&&=) :: (MonadState s m, AsLensLike ((,) Bool) k) => Optic' k s Bool -> Bool -> m Bool
 l <&&= b = l <%= (&& b)
 {-# INLINE (<&&=) #-}
 
--- | Modify the target of a 'R_Lens' into your 'Monad''s state by a user supplied
+-- | Modify the target of a 'Lens' into your 'Monad''s state by a user supplied
 -- function and return the /old/ value that was replaced.
 --
--- When applied to a 'Control.R_Lens.R_Traversal.R_Traversal', this will return a monoidal summary of all of the old values
+-- When applied to a 'Control.Lens.Traversal.Traversal', this will return a monoidal summary of all of the old values
 -- present.
 --
--- When you do not need the result of the operation, ('Control.R_Lens.R_Setter.%=') is more flexible.
+-- When you do not need the result of the operation, ('Control.Lens.Setter.%=') is more flexible.
 --
 -- @
--- ('<<%=') :: 'MonadState' s m             => 'R_Lens'' s a      -> (a -> a) -> m a
--- ('<<%=') :: 'MonadState' s m             => 'Control.R_Lens.R_Iso.R_Iso'' s a       -> (a -> a) -> m a
--- ('<<%=') :: ('MonadState' s m, 'Monoid' a) => 'Control.R_Lens.R_Traversal.R_Traversal'' s a -> (a -> a) -> m a
+-- ('<<%=') :: 'MonadState' s m             => 'Lens'' s a      -> (a -> a) -> m a
+-- ('<<%=') :: 'MonadState' s m             => 'Control.Lens.Iso.Iso'' s a       -> (a -> a) -> m a
+-- ('<<%=') :: ('MonadState' s m, 'Monoid' a) => 'Control.Lens.Traversal.Traversal'' s a -> (a -> a) -> m a
 -- @
 --
--- @('<<%=') :: 'MonadState' s m => 'R_LensLike' ((,)a) s s a b -> (a -> b) -> m a@
-(<<%=) :: (Strong p, MonadState s m) => R_Over p ((,)a) s s a b -> p a b -> m a
+-- @('<<%=') :: 'MonadState' s m => 'LensLike' ((,) a) s s a b -> (a -> b) -> m a@
+(<<%=) :: (MonadState s m, Strong p, AsOver p ((,) a) k) => Optic k s s a b -> p a b -> m a
 l <<%= f = l %%= lmap (\a -> (a,a)) (second' f)
 {-# INLINE (<<%=) #-}
 
--- | Replace the target of a 'R_Lens' into your 'Monad''s state with a user supplied
+-- | Replace the target of a 'Lens' into your 'Monad''s state with a user supplied
 -- value and return the /old/ value that was replaced.
 --
--- When applied to a 'Control.R_Lens.R_Traversal.R_Traversal', this will return a monoidal summary of all of the old values
+-- When applied to a 'Control.Lens.Traversal.Traversal', this will return a monoidal summary of all of the old values
 -- present.
 --
--- When you do not need the result of the operation, ('Control.R_Lens.R_Setter..=') is more flexible.
+-- When you do not need the result of the operation, ('Control.Lens.Setter..=') is more flexible.
 --
 -- @
--- ('<<.=') :: 'MonadState' s m             => 'R_Lens'' s a      -> a -> m a
--- ('<<.=') :: 'MonadState' s m             => 'Control.R_Lens.R_Iso.R_Iso'' s a       -> a -> m a
--- ('<<.=') :: ('MonadState' s m, 'Monoid' a) => 'Control.R_Lens.R_Traversal.R_Traversal'' s a -> a -> m a
+-- ('<<.=') :: 'MonadState' s m             => 'Lens'' s a      -> a -> m a
+-- ('<<.=') :: 'MonadState' s m             => 'Control.Lens.Iso.Iso'' s a       -> a -> m a
+-- ('<<.=') :: ('MonadState' s m, 'Monoid' a) => 'Control.Lens.Traversal.Traversal'' s a -> a -> m a
 -- @
-(<<.=) :: MonadState s m => R_LensLike ((,)a) s s a b -> b -> m a
-l <<.= b = l %%= \a -> (a,b)
+(<<.=) :: (MonadState s m, AsLensLike ((,) a) k) => Optic k s s a b -> b -> m a
+l <<.= b = toLensLike l %%= \a -> (a,b)
 {-# INLINE (<<.=) #-}
 
--- | Replace the target of a 'R_Lens' into your 'Monad''s state with 'Just' a user supplied
+-- | Replace the target of a 'Lens' into your 'Monad''s state with 'Just' a user supplied
 -- value and return the /old/ value that was replaced.
 --
--- When applied to a 'Control.R_Lens.R_Traversal.R_Traversal', this will return a monoidal summary of all of the old values
+-- When applied to a 'Control.Lens.Traversal.Traversal', this will return a monoidal summary of all of the old values
 -- present.
 --
--- When you do not need the result of the operation, ('Control.R_Lens.R_Setter.?=') is more flexible.
+-- When you do not need the result of the operation, ('Control.Lens.Setter.?=') is more flexible.
 --
 -- @
--- ('<<?=') :: 'MonadState' s m             => 'R_Lens' s t a (Maybe b)      -> b -> m a
--- ('<<?=') :: 'MonadState' s m             => 'Control.R_Lens.R_Iso.R_Iso' s t a (Maybe b)       -> b -> m a
--- ('<<?=') :: ('MonadState' s m, 'Monoid' a) => 'Control.R_Lens.R_Traversal.R_Traversal' s t a (Maybe b) -> b -> m a
+-- ('<<?=') :: 'MonadState' s m             => 'Lens' s t a (Maybe b)      -> b -> m a
+-- ('<<?=') :: 'MonadState' s m             => 'Control.Lens.Iso.Iso' s t a (Maybe b)       -> b -> m a
+-- ('<<?=') :: ('MonadState' s m, 'Monoid' a) => 'Control.Lens.Traversal.Traversal' s t a (Maybe b) -> b -> m a
 -- @
-(<<?=) :: MonadState s m => R_LensLike ((,)a) s s a (Maybe b) -> b -> m a
+(<<?=) :: (MonadState s m, AsLensLike ((,) a) k) => Optic k s s a (Maybe b) -> b -> m a
 l <<?= b = l <<.= Just b
 {-# INLINE (<<?=) #-}
 
--- | Modify the target of a 'R_Lens' into your 'Monad''s state by adding a value
+-- | Modify the target of a 'Lens' into your 'Monad''s state by adding a value
 -- and return the /old/ value that was replaced.
 --
--- When you do not need the result of the operation, ('Control.R_Lens.R_Setter.+=') is more flexible.
+-- When you do not need the result of the operation, ('Control.Lens.Setter.+=') is more flexible.
 --
 -- @
--- ('<<+=') :: ('MonadState' s m, 'Num' a) => 'R_Lens'' s a -> a -> m a
--- ('<<+=') :: ('MonadState' s m, 'Num' a) => 'R_Iso'' s a -> a -> m a
+-- ('<<+=') :: ('MonadState' s m, 'Num' a) => 'Lens'' s a -> a -> m a
+-- ('<<+=') :: ('MonadState' s m, 'Num' a) => 'Iso'' s a -> a -> m a
 -- @
-(<<+=) :: (MonadState s m, Num a) => R_LensLike' ((,) a) s a -> a -> m a
-l <<+= n = l %%= \a -> (a, a + n)
+(<<+=) :: (MonadState s m, Num a, AsLensLike ((,) a) k) => Optic' k s a -> a -> m a
+l <<+= n = toLensLike l %%= \a -> (a, a + n)
 {-# INLINE (<<+=) #-}
 
--- | Modify the target of a 'R_Lens' into your 'Monad''s state by subtracting a value
+-- | Modify the target of a 'Lens' into your 'Monad''s state by subtracting a value
 -- and return the /old/ value that was replaced.
 --
--- When you do not need the result of the operation, ('Control.R_Lens.R_Setter.-=') is more flexible.
+-- When you do not need the result of the operation, ('Control.Lens.Setter.-=') is more flexible.
 --
 -- @
--- ('<<-=') :: ('MonadState' s m, 'Num' a) => 'R_Lens'' s a -> a -> m a
--- ('<<-=') :: ('MonadState' s m, 'Num' a) => 'R_Iso'' s a -> a -> m a
+-- ('<<-=') :: ('MonadState' s m, 'Num' a) => 'Lens'' s a -> a -> m a
+-- ('<<-=') :: ('MonadState' s m, 'Num' a) => 'Iso'' s a -> a -> m a
 -- @
-(<<-=) :: (MonadState s m, Num a) => R_LensLike' ((,) a) s a -> a -> m a
-l <<-= n = l %%= \a -> (a, a - n)
+(<<-=) :: (MonadState s m, Num a, AsLensLike ((,) a) k) => Optic' k s a -> a -> m a
+l <<-= n = toLensLike l %%= \a -> (a, a - n)
 {-# INLINE (<<-=) #-}
 
--- | Modify the target of a 'R_Lens' into your 'Monad''s state by multipling a value
+-- | Modify the target of a 'Lens' into your 'Monad''s state by multipling a value
 -- and return the /old/ value that was replaced.
 --
--- When you do not need the result of the operation, ('Control.R_Lens.R_Setter.*=') is more flexible.
+-- When you do not need the result of the operation, ('Control.Lens.Setter.*=') is more flexible.
 --
 -- @
--- ('<<*=') :: ('MonadState' s m, 'Num' a) => 'R_Lens'' s a -> a -> m a
--- ('<<*=') :: ('MonadState' s m, 'Num' a) => 'R_Iso'' s a -> a -> m a
+-- ('<<*=') :: ('MonadState' s m, 'Num' a) => 'Lens'' s a -> a -> m a
+-- ('<<*=') :: ('MonadState' s m, 'Num' a) => 'Iso'' s a -> a -> m a
 -- @
-(<<*=) :: (MonadState s m, Num a) => R_LensLike' ((,) a) s a -> a -> m a
-l <<*= n = l %%= \a -> (a, a * n)
+(<<*=) :: (MonadState s m, Num a, AsLensLike ((,) a) k) => Optic' k s a -> a -> m a
+l <<*= n = toLensLike l %%= \a -> (a, a * n)
 {-# INLINE (<<*=) #-}
 
--- | Modify the target of a 'R_Lens' into your 'Monad'\s state by dividing by a value
+-- | Modify the target of a 'Lens' into your 'Monad'\s state by dividing by a value
 -- and return the /old/ value that was replaced.
 --
--- When you do not need the result of the operation, ('Control.R_Lens.R_Setter.//=') is more flexible.
+-- When you do not need the result of the operation, ('Control.Lens.Setter.//=') is more flexible.
 --
 -- @
--- ('<<//=') :: ('MonadState' s m, 'Fractional' a) => 'R_Lens'' s a -> a -> m a
--- ('<<//=') :: ('MonadState' s m, 'Fractional' a) => 'R_Iso'' s a -> a -> m a
+-- ('<<//=') :: ('MonadState' s m, 'Fractional' a) => 'Lens'' s a -> a -> m a
+-- ('<<//=') :: ('MonadState' s m, 'Fractional' a) => 'Iso'' s a -> a -> m a
 -- @
-(<<//=) :: (MonadState s m, Fractional a) => R_LensLike' ((,) a) s a -> a -> m a
-l <<//= n = l %%= \a -> (a, a / n)
+(<<//=) :: (MonadState s m, Fractional a, AsLensLike ((,) a) k) => Optic' k s a -> a -> m a
+l <<//= n = toLensLike l %%= \a -> (a, a / n)
 {-# INLINE (<<//=) #-}
 
--- | Modify the target of a 'R_Lens' into your 'Monad''s state by raising it by a non-negative power
+-- | Modify the target of a 'Lens' into your 'Monad''s state by raising it by a non-negative power
 -- and return the /old/ value that was replaced.
 --
--- When you do not need the result of the operation, ('Control.R_Lens.R_Setter.^=') is more flexible.
+-- When you do not need the result of the operation, ('Control.Lens.Setter.^=') is more flexible.
 --
 -- @
--- ('<<^=') :: ('MonadState' s m, 'Num' a, 'Integral' e) => 'R_Lens'' s a -> e -> m a
--- ('<<^=') :: ('MonadState' s m, 'Num' a, 'Integral' e) => 'R_Iso'' s a -> a -> m a
+-- ('<<^=') :: ('MonadState' s m, 'Num' a, 'Integral' e) => 'Lens'' s a -> e -> m a
+-- ('<<^=') :: ('MonadState' s m, 'Num' a, 'Integral' e) => 'Iso'' s a -> a -> m a
 -- @
-(<<^=) :: (MonadState s m, Num a, Integral e) => R_LensLike' ((,) a) s a -> e -> m a
-l <<^= n = l %%= \a -> (a, a ^ n)
+(<<^=) :: (MonadState s m, Num a, Integral e, AsLensLike ((,) a) k) => Optic' k s a -> e -> m a
+l <<^= n = toLensLike l %%= \a -> (a, a ^ n)
 {-# INLINE (<<^=) #-}
 
--- | Modify the target of a 'R_Lens' into your 'Monad''s state by raising it by an integral power
+-- | Modify the target of a 'Lens' into your 'Monad''s state by raising it by an integral power
 -- and return the /old/ value that was replaced.
 --
--- When you do not need the result of the operation, ('Control.R_Lens.R_Setter.^^=') is more flexible.
+-- When you do not need the result of the operation, ('Control.Lens.Setter.^^=') is more flexible.
 --
 -- @
--- ('<<^^=') :: ('MonadState' s m, 'Fractional' a, 'Integral' e) => 'R_Lens'' s a -> e -> m a
--- ('<<^^=') :: ('MonadState' s m, 'Fractional' a, 'Integral' e) => 'R_Iso'' s a -> e -> m a
+-- ('<<^^=') :: ('MonadState' s m, 'Fractional' a, 'Integral' e) => 'Lens'' s a -> e -> m a
+-- ('<<^^=') :: ('MonadState' s m, 'Fractional' a, 'Integral' e) => 'Iso'' s a -> e -> m a
 -- @
-(<<^^=) :: (MonadState s m, Fractional a, Integral e) => R_LensLike' ((,) a) s a -> e -> m a
-l <<^^= n = l %%= \a -> (a, a ^^ n)
+(<<^^=) :: (MonadState s m, Fractional a, Integral e, AsLensLike ((,) a) k) => Optic' k s a -> e -> m a
+l <<^^= n = toLensLike l %%= \a -> (a, a ^^ n)
 {-# INLINE (<<^^=) #-}
 
--- | Modify the target of a 'R_Lens' into your 'Monad''s state by raising it by an arbitrary power
+-- | Modify the target of a 'Lens' into your 'Monad''s state by raising it by an arbitrary power
 -- and return the /old/ value that was replaced.
 --
--- When you do not need the result of the operation, ('Control.R_Lens.R_Setter.**=') is more flexible.
+-- When you do not need the result of the operation, ('Control.Lens.Setter.**=') is more flexible.
 --
 -- @
--- ('<<**=') :: ('MonadState' s m, 'Floating' a) => 'R_Lens'' s a -> a -> m a
--- ('<<**=') :: ('MonadState' s m, 'Floating' a) => 'R_Iso'' s a -> a -> m a
+-- ('<<**=') :: ('MonadState' s m, 'Floating' a) => 'Lens'' s a -> a -> m a
+-- ('<<**=') :: ('MonadState' s m, 'Floating' a) => 'Iso'' s a -> a -> m a
 -- @
-(<<**=) :: (MonadState s m, Floating a) => R_LensLike' ((,) a) s a -> a -> m a
-l <<**= n = l %%= \a -> (a, a ** n)
+(<<**=) :: (MonadState s m, Floating a, AsLensLike ((,) a) k) => Optic' k s a -> a -> m a
+l <<**= n = toLensLike l %%= \a -> (a, a ** n)
 {-# INLINE (<<**=) #-}
 
--- | Modify the target of a 'R_Lens' into your 'Monad''s state by taking its logical '||' with a value
+-- | Modify the target of a 'Lens' into your 'Monad''s state by taking its logical '||' with a value
 -- and return the /old/ value that was replaced.
 --
--- When you do not need the result of the operation, ('Control.R_Lens.R_Setter.||=') is more flexible.
+-- When you do not need the result of the operation, ('Control.Lens.Setter.||=') is more flexible.
 --
 -- @
--- ('<<||=') :: 'MonadState' s m => 'R_Lens'' s 'Bool' -> 'Bool' -> m 'Bool'
--- ('<<||=') :: 'MonadState' s m => 'R_Iso'' s 'Bool' -> 'Bool' -> m 'Bool'
+-- ('<<||=') :: 'MonadState' s m => 'Lens'' s 'Bool' -> 'Bool' -> m 'Bool'
+-- ('<<||=') :: 'MonadState' s m => 'Iso'' s 'Bool' -> 'Bool' -> m 'Bool'
 -- @
-(<<||=) :: MonadState s m => R_LensLike' ((,) Bool) s Bool -> Bool -> m Bool
-l <<||= b = l %%= \a -> (a, a || b)
+(<<||=) :: (MonadState s m, AsLensLike ((,) Bool) k) => Optic' k s Bool -> Bool -> m Bool
+l <<||= b = toLensLike l %%= \a -> (a, a || b)
 {-# INLINE (<<||=) #-}
 
--- | Modify the target of a 'R_Lens' into your 'Monad''s state by taking its logical '&&' with a value
+-- | Modify the target of a 'Lens' into your 'Monad''s state by taking its logical '&&' with a value
 -- and return the /old/ value that was replaced.
 --
--- When you do not need the result of the operation, ('Control.R_Lens.R_Setter.&&=') is more flexible.
+-- When you do not need the result of the operation, ('Control.Lens.Setter.&&=') is more flexible.
 --
 -- @
--- ('<<&&=') :: 'MonadState' s m => 'R_Lens'' s 'Bool' -> 'Bool' -> m 'Bool'
--- ('<<&&=') :: 'MonadState' s m => 'R_Iso'' s 'Bool' -> 'Bool' -> m 'Bool'
+-- ('<<&&=') :: 'MonadState' s m => 'Lens'' s 'Bool' -> 'Bool' -> m 'Bool'
+-- ('<<&&=') :: 'MonadState' s m => 'Iso'' s 'Bool' -> 'Bool' -> m 'Bool'
 -- @
-(<<&&=) :: MonadState s m => R_LensLike' ((,) Bool) s Bool -> Bool -> m Bool
-l <<&&= b = l %%= \a -> (a, a && b)
+(<<&&=) :: (MonadState s m, AsLensLike ((,) Bool) k) => Optic' k s Bool -> Bool -> m Bool
+l <<&&= b = toLensLike l %%= \a -> (a, a && b)
 {-# INLINE (<<&&=) #-}
 
--- | Modify the target of a 'R_Lens' into your 'Monad''s state by 'mappend'ing a value
+-- | Modify the target of a 'Lens' into your 'Monad''s state by 'mappend'ing a value
 -- and return the /old/ value that was replaced.
 --
--- When you do not need the result of the operation, ('Control.R_Lens.R_Setter.<>=') is more flexible.
+-- When you do not need the result of the operation, ('Control.Lens.Setter.<>=') is more flexible.
 --
 -- @
--- ('<<<>=') :: ('MonadState' s m, 'Monoid' r) => 'R_Lens'' s r -> r -> m r
--- ('<<<>=') :: ('MonadState' s m, 'Monoid' r) => 'R_Iso'' s r -> r -> m r
+-- ('<<<>=') :: ('MonadState' s m, 'Monoid' r) => 'Lens'' s r -> r -> m r
+-- ('<<<>=') :: ('MonadState' s m, 'Monoid' r) => 'Iso'' s r -> r -> m r
 -- @
-(<<<>=) :: (MonadState s m, Monoid r) => R_LensLike' ((,) r) s r -> r -> m r
-l <<<>= b = l %%= \a -> (a, a `mappend` b)
+(<<<>=) :: (MonadState s m, Monoid r, AsLensLike ((,) r) k) => Optic' k s r -> r -> m r
+l <<<>= b = toLensLike l %%= \a -> (a, a `mappend` b)
 {-# INLINE (<<<>=) #-}
 
--- | Run a monadic action, and set the target of 'R_Lens' to its result.
+-- | Run a monadic action, and set the target of 'Lens' to its result.
 --
 -- @
--- ('<<~') :: 'MonadState' s m => 'Control.R_Lens.R_Iso.R_Iso' s s a b   -> m b -> m b
--- ('<<~') :: 'MonadState' s m => 'R_Lens' s s a b  -> m b -> m b
+-- ('<<~') :: 'MonadState' s m => 'Control.Lens.Iso.Iso' s s a b   -> m b -> m b
+-- ('<<~') :: 'MonadState' s m => 'Lens' s s a b  -> m b -> m b
 -- @
 --
--- NB: This is limited to taking an actual 'R_Lens' than admitting a 'Control.R_Lens.R_Traversal.R_Traversal' because
+-- NB: This is limited to taking an actual 'Lens' than admitting a 'Control.Lens.Traversal.Traversal' because
 -- there are potential loss of state issues otherwise.
-(<<~) :: MonadState s m => R_ALens s s a b -> m b -> m b
+(<<~) :: MonadState s m => ALens s s a b -> m b -> m b
 l <<~ mb = do
   b <- mb
-  modify $ \s -> ipeek b (l sell s)
+  modify $ \s -> ipeek b (runOptic l sell s)
   return b
 {-# INLINE (<<~) #-}
 
--- | 'mappend' a monoidal value onto the end of the target of a 'R_Lens' and
+-- | 'mappend' a monoidal value onto the end of the target of a 'Lens' and
 -- return the result.
 --
--- When you do not need the result of the operation, ('Control.R_Lens.R_Setter.<>~') is more flexible.
-(<<>~) :: Monoid m => R_LensLike ((,)m) s t m m -> m -> s -> (m, t)
+-- When you do not need the result of the operation, ('Control.Lens.Setter.<>~') is more flexible.
+(<<>~) :: (Monoid m, AsLensLike ((,) m) k) => Optic k s t m m -> m -> s -> (m, t)
 l <<>~ m = l <%~ (`mappend` m)
 {-# INLINE (<<>~) #-}
 
--- | 'mappend' a monoidal value onto the end of the target of a 'R_Lens' into
+-- | 'mappend' a monoidal value onto the end of the target of a 'Lens' into
 -- your 'Monad''s state and return the result.
 --
--- When you do not need the result of the operation, ('Control.R_Lens.R_Setter.<>=') is more flexible.
-(<<>=) :: (MonadState s m, Monoid r) => R_LensLike' ((,)r) s r -> r -> m r
+-- When you do not need the result of the operation, ('Control.Lens.Setter.<>=') is more flexible.
+(<<>=) :: (MonadState s m, Monoid r, AsLensLike ((,) r) k) => Optic' k s r -> r -> m r
 l <<>= r = l <%= (`mappend` r)
 {-# INLINE (<<>=) #-}
 
@@ -1261,20 +1294,20 @@ l <<>= r = l <%= (`mappend` r)
 -- Arrow operators
 ------------------------------------------------------------------------------
 
--- | 'Control.R_Lens.R_Setter.over' for Arrows.
+-- | 'Control.Lens.Setter.over' for Arrows.
 --
--- Unlike 'Control.R_Lens.R_Setter.over', 'overA' can't accept a simple
--- 'Control.R_Lens.R_Setter.R_Setter', but requires a full lens, or close
+-- Unlike 'Control.Lens.Setter.over', 'overA' can't accept a simple
+-- 'Control.Lens.Setter.Setter', but requires a full lens, or close
 -- enough.
 --
 -- >>> overA _1 ((+1) *** (+2)) ((1,2),6)
 -- ((2,4),6)
 --
 -- @
--- overA :: Arrow ar => R_Lens s t a b -> ar a b -> ar s t
+-- overA :: Arrow ar => Lens s t a b -> ar a b -> ar s t
 -- @
-overA :: Arrow ar => R_LensLike (Context a b) s t a b -> ar a b -> ar s t
-overA l p = arr (\s -> let (Context f a) = l sell s in (f, a))
+overA :: (Arrow ar, AsLensLike (Context a b) k) => Optic k s t a b -> ar a b -> ar s t
+overA l p = arr (\s -> let Context f a = runLensLike l sell s in (f, a))
             >>> second p
             >>> arr (uncurry id)
 
@@ -1282,8 +1315,8 @@ overA l p = arr (\s -> let (Context f a) = l sell s in (f, a))
 -- Indexed
 ------------------------------------------------------------------------------
 
--- | Adjust the target of an 'R_IndexedLens' returning the intermediate result, or
--- adjust all of the targets of an 'Control.R_Lens.R_Traversal.R_IndexedTraversal' and return a monoidal summary
+-- | Adjust the target of an 'IndexedLens' returning the intermediate result, or
+-- adjust all of the targets of an 'Control.Lens.Traversal.IndexedTraversal' and return a monoidal summary
 -- along with the answer.
 --
 -- @
@@ -1292,55 +1325,58 @@ overA l p = arr (\s -> let (Context f a) = l sell s in (f, a))
 --
 -- When you do not need access to the index then ('<%~') is more liberal in what it can accept.
 --
--- If you do not need the intermediate result, you can use ('Control.R_Lens.R_Setter.%@~') or even ('Control.R_Lens.R_Setter.%~').
+-- If you do not need the intermediate result, you can use ('Control.Lens.Setter.%@~') or even ('Control.Lens.Setter.%~').
 --
 -- @
--- ('<%@~') ::             'R_IndexedLens' i s t a b      -> (i -> a -> b) -> s -> (b, t)
--- ('<%@~') :: 'Monoid' b => 'Control.R_Lens.R_Traversal.R_IndexedTraversal' i s t a b -> (i -> a -> b) -> s -> (b, t)
+-- ('<%@~') ::             'IndexedLens' i s t a b      -> (i -> a -> b) -> s -> (b, t)
+-- ('<%@~') :: 'Monoid' b => 'Control.Lens.Traversal.IndexedTraversal' i s t a b -> (i -> a -> b) -> s -> (b, t)
 -- @
-(<%@~) :: R_Over (Indexed i) ((,) b) s t a b -> (i -> a -> b) -> s -> (b, t)
-l <%@~ f = l (Indexed $ \i a -> let b = f i a in (b, b))
+(<%@~) :: (AsOver (Indexed i) ((,) b) k) => Optic k s t a b -> (i -> a -> b) -> s -> (b, t)
+l <%@~ f = runOver l (Indexed $ \i a -> let b = f i a in (b, b))
 {-# INLINE (<%@~) #-}
 
--- | Adjust the target of an 'R_IndexedLens' returning the old value, or
--- adjust all of the targets of an 'Control.R_Lens.R_Traversal.R_IndexedTraversal' and return a monoidal summary
+-- | Adjust the target of an 'IndexedLens' returning the old value, or
+-- adjust all of the targets of an 'Control.Lens.Traversal.IndexedTraversal' and return a monoidal summary
 -- of the old values along with the answer.
 --
 -- @
--- ('<<%@~') ::             'R_IndexedLens' i s t a b      -> (i -> a -> b) -> s -> (a, t)
--- ('<<%@~') :: 'Monoid' a => 'Control.R_Lens.R_Traversal.R_IndexedTraversal' i s t a b -> (i -> a -> b) -> s -> (a, t)
+-- ('<<%@~') ::             'IndexedLens' i s t a b      -> (i -> a -> b) -> s -> (a, t)
+-- ('<<%@~') :: 'Monoid' a => 'Control.Lens.Traversal.IndexedTraversal' i s t a b -> (i -> a -> b) -> s -> (a, t)
 -- @
-(<<%@~) :: R_Over (Indexed i) ((,) a) s t a b -> (i -> a -> b) -> s -> (a, t)
-l <<%@~ f = l $ Indexed $ \i a -> second' (f i) (a,a)
+(<<%@~) :: (AsOver (Indexed i) ((,) a) k) => Optic k s t a b -> (i -> a -> b) -> s -> (a, t)
+l <<%@~ f = runOver l $ Indexed $ \i a -> second' (f i) (a,a)
 
 {-# INLINE (<<%@~) #-}
 
--- | Adjust the target of an 'R_IndexedLens' returning a supplementary result, or
--- adjust all of the targets of an 'Control.R_Lens.R_Traversal.R_IndexedTraversal' and return a monoidal summary
+-- | Adjust the target of an 'IndexedLens' returning a supplementary result, or
+-- adjust all of the targets of an 'Control.Lens.Traversal.IndexedTraversal' and return a monoidal summary
 -- of the supplementary results and the answer.
 --
 -- @
--- ('%%@~') ≡ 'Control.R_Lens.Indexed.withIndex'
+-- ('%%@~') ≡ 'Control.Lens.Indexed.withIndex'
 -- @
 --
 -- @
--- ('%%@~') :: 'Functor' f => 'R_IndexedLens' i s t a b      -> (i -> a -> f b) -> s -> f t
--- ('%%@~') :: 'Applicative' f => 'Control.R_Lens.R_Traversal.R_IndexedTraversal' i s t a b -> (i -> a -> f b) -> s -> f t
+-- ('%%@~') :: 'Functor' f => 'IndexedLens' i s t a b      -> (i -> a -> f b) -> s -> f t
+-- ('%%@~') :: 'Applicative' f => 'Control.Lens.Traversal.IndexedTraversal' i s t a b -> (i -> a -> f b) -> s -> f t
 -- @
 --
 -- In particular, it is often useful to think of this function as having one of these even more
 -- restricted type signatures:
 --
 -- @
--- ('%%@~') ::             'R_IndexedLens' i s t a b      -> (i -> a -> (r, b)) -> s -> (r, t)
--- ('%%@~') :: 'Monoid' r => 'Control.R_Lens.R_Traversal.R_IndexedTraversal' i s t a b -> (i -> a -> (r, b)) -> s -> (r, t)
+-- ('%%@~') ::             'IndexedLens' i s t a b      -> (i -> a -> (r, b)) -> s -> (r, t)
+-- ('%%@~') :: 'Monoid' r => 'Control.Lens.Traversal.IndexedTraversal' i s t a b -> (i -> a -> (r, b)) -> s -> (r, t)
 -- @
-(%%@~) :: R_IndexedLensLike i f s t a b -> (i -> a -> f b) -> s -> f t
-(%%@~) l = l .# Indexed
+(%%@~) :: AsIndexedLensLike i f k => Optic k s t a b -> (i -> a -> f b) -> s -> f t
+(%%@~) l = runOptic (toIndexedLensLike l) .# Indexed
 {-# INLINE (%%@~) #-}
 
--- | Adjust the target of an 'R_IndexedLens' returning a supplementary result, or
--- adjust all of the targets of an 'Control.R_Lens.R_Traversal.R_IndexedTraversal' within the current state, and
+toIndexedLensLike :: AsIndexedLensLike i f k => Optic k s t a b -> IndexedLensLike i f s t a b
+toIndexedLensLike = sub
+
+-- | Adjust the target of an 'IndexedLens' returning a supplementary result, or
+-- adjust all of the targets of an 'Control.Lens.Traversal.IndexedTraversal' within the current state, and
 -- return a monoidal summary of the supplementary results.
 --
 -- @
@@ -1348,141 +1384,127 @@ l <<%@~ f = l $ Indexed $ \i a -> second' (f i) (a,a)
 -- @
 --
 -- @
--- ('%%@=') :: 'MonadState' s m                 => 'R_IndexedLens' i s s a b      -> (i -> a -> (r, b)) -> s -> m r
--- ('%%@=') :: ('MonadState' s m, 'Monoid' r) => 'Control.R_Lens.R_Traversal.R_IndexedTraversal' i s s a b -> (i -> a -> (r, b)) -> s -> m r
+-- ('%%@=') :: 'MonadState' s m                 => 'IndexedLens' i s s a b      -> (i -> a -> (r, b)) -> s -> m r
+-- ('%%@=') :: ('MonadState' s m, 'Monoid' r) => 'Control.Lens.Traversal.IndexedTraversal' i s s a b -> (i -> a -> (r, b)) -> s -> m r
 -- @
-(%%@=) :: MonadState s m => R_IndexedLensLike i ((,) r) s s a b -> (i -> a -> (r, b)) -> m r
-#if MIN_VERSION_mtl(2,1,0)
-l %%@= f = State.state (l %%@~ f)
-#else
-l %%@= f = do
-  (r, s) <- State.gets (l %%@~ f)
-  State.put s
-  return r
-#endif
+(%%@=) :: (MonadState s m, AsIndexedLensLike i ((,) r) k) => Optic k s s a b -> (i -> a -> (r, b)) -> m r
+l %%@= f = State.state (toIndexedLensLike l %%@~ f)
 {-# INLINE (%%@=) #-}
 
--- | Adjust the target of an 'R_IndexedLens' returning the intermediate result, or
--- adjust all of the targets of an 'Control.R_Lens.R_Traversal.R_IndexedTraversal' within the current state, and
+-- | Adjust the target of an 'IndexedLens' returning the intermediate result, or
+-- adjust all of the targets of an 'Control.Lens.Traversal.IndexedTraversal' within the current state, and
 -- return a monoidal summary of the intermediate results.
 --
 -- @
--- ('<%@=') :: 'MonadState' s m                 => 'R_IndexedLens' i s s a b      -> (i -> a -> b) -> m b
--- ('<%@=') :: ('MonadState' s m, 'Monoid' b) => 'Control.R_Lens.R_Traversal.R_IndexedTraversal' i s s a b -> (i -> a -> b) -> m b
+-- ('<%@=') :: 'MonadState' s m                 => 'IndexedLens' i s s a b      -> (i -> a -> b) -> m b
+-- ('<%@=') :: ('MonadState' s m, 'Monoid' b) => 'Control.Lens.Traversal.IndexedTraversal' i s s a b -> (i -> a -> b) -> m b
 -- @
-(<%@=) :: MonadState s m => R_IndexedLensLike i ((,) b) s s a b -> (i -> a -> b) -> m b
+(<%@=) :: (MonadState s m, AsIndexedLensLike i ((,) b) k) => Optic k s s a b -> (i -> a -> b) -> m b
 l <%@= f = l %%@= \ i a -> let b = f i a in (b, b)
 {-# INLINE (<%@=) #-}
 
--- | Adjust the target of an 'R_IndexedLens' returning the old value, or
--- adjust all of the targets of an 'Control.R_Lens.R_Traversal.R_IndexedTraversal' within the current state, and
+-- | Adjust the target of an 'IndexedLens' returning the old value, or
+-- adjust all of the targets of an 'Control.Lens.Traversal.IndexedTraversal' within the current state, and
 -- return a monoidal summary of the old values.
 --
 -- @
--- ('<<%@=') :: 'MonadState' s m                 => 'R_IndexedLens' i s s a b      -> (i -> a -> b) -> m a
--- ('<<%@=') :: ('MonadState' s m, 'Monoid' b) => 'Control.R_Lens.R_Traversal.R_IndexedTraversal' i s s a b -> (i -> a -> b) -> m a
+-- ('<<%@=') :: 'MonadState' s m                 => 'IndexedLens' i s s a b      -> (i -> a -> b) -> m a
+-- ('<<%@=') :: ('MonadState' s m, 'Monoid' b) => 'Control.Lens.Traversal.IndexedTraversal' i s s a b -> (i -> a -> b) -> m a
 -- @
-(<<%@=) :: MonadState s m => R_IndexedLensLike i ((,) a) s s a b -> (i -> a -> b) -> m a
-#if MIN_VERSION_mtl(2,1,0)
-l <<%@= f = State.state (l (Indexed $ \ i a -> (a, f i a)))
-#else
-l <<%@= f = do
-  (r, s) <- State.gets (l (Indexed $ \ i a -> (a, f i a)))
-  State.put s
-  return r
-#endif
+(<<%@=) :: (MonadState s m, AsIndexedLensLike i ((,) a) k) => Optic k s s a b -> (i -> a -> b) -> m a
+l <<%@= f = State.state (runOptic (toIndexedLensLike l) (Indexed $ \ i a -> (a, f i a)))
 {-# INLINE (<<%@=) #-}
 
 ------------------------------------------------------------------------------
--- R_ALens Combinators
+-- ALens Combinators
 ------------------------------------------------------------------------------
 
--- | A version of ('Control.R_Lens.R_Getter.^.') that works on 'R_ALens'.
+-- | A version of ('Control.Lens.Getter.^.') that works on 'R_ALens'.
 --
 -- >>> ("hello","world")^#_2
 -- "world"
-(^#) :: s -> R_ALens s t a b -> a
-s ^# l = ipos (l sell s)
+(^#) :: s -> ALens s t a b -> a
+s ^# l = ipos (runOptic l sell s)
 {-# INLINE (^#) #-}
 
--- | A version of 'Control.R_Lens.R_Setter.set' that works on 'R_ALens'.
+-- | A version of 'Control.Lens.Setter.set' that works on 'R_ALens'.
 --
 -- >>> storing _2 "world" ("hello","there")
 -- ("hello","world")
-storing :: R_ALens s t a b -> b -> s -> t
-storing l b s = ipeek b (l sell s)
+storing :: ALens s t a b -> b -> s -> t
+storing l b s = ipeek b (runOptic l sell s)
 {-# INLINE storing #-}
 
--- | A version of ('Control.R_Lens.R_Setter..~') that works on 'R_ALens'.
+-- | A version of ('Control.Lens.Setter..~') that works on 'R_ALens'.
 --
 -- >>> ("hello","there") & _2 #~ "world"
 -- ("hello","world")
-( #~ ) :: R_ALens s t a b -> b -> s -> t
-( #~ ) l b s = ipeek b (l sell s)
-{-# INLINE ( #~ ) #-}
+(#~) :: ALens s t a b -> b -> s -> t
+(#~) l b s = ipeek b (runOptic l sell s)
+{-# INLINE (#~) #-}
 
--- | A version of ('Control.R_Lens.R_Setter.%~') that works on 'R_ALens'.
+-- | A version of ('Control.Lens.Setter.%~') that works on 'R_ALens'.
 --
 -- >>> ("hello","world") & _2 #%~ length
 -- ("hello",5)
-( #%~ ) :: R_ALens s t a b -> (a -> b) -> s -> t
-( #%~ ) l f s = ipeeks f (l sell s)
-{-# INLINE ( #%~ ) #-}
+(#%~) :: ALens s t a b -> (a -> b) -> s -> t
+(#%~) l f s = ipeeks f (runOptic l sell s)
+{-# INLINE (#%~) #-}
 
 -- | A version of ('%%~') that works on 'R_ALens'.
 --
 -- >>> ("hello","world") & _2 #%%~ \x -> (length x, x ++ "!")
 -- (5,("hello","world!"))
-( #%%~ ) :: Functor f => R_ALens s t a b -> (a -> f b) -> s -> f t
-( #%%~ ) l f s = runPretext (l sell s) f
-{-# INLINE ( #%%~ ) #-}
+(#%%~) :: Functor f => ALens s t a b -> (a -> f b) -> s -> f t
+(#%%~) l f s = runPretext (runOptic l sell s) f
+{-# INLINE (#%%~) #-}
 
--- | A version of ('Control.R_Lens.R_Setter..=') that works on 'R_ALens'.
-( #= ) :: MonadState s m => R_ALens s s a b -> b -> m ()
+-- | A version of ('Control.Lens.Setter..=') that works on 'ALens'.
+(#=) :: MonadState s m => ALens s s a b -> b -> m ()
 l #= f = modify (l #~ f)
-{-# INLINE ( #= ) #-}
+{-# INLINE (#=) #-}
 
--- | A version of ('Control.R_Lens.R_Setter.%=') that works on 'R_ALens'.
-( #%= ) :: MonadState s m => R_ALens s s a b -> (a -> b) -> m ()
+-- | A version of ('Control.Lens.Setter.%=') that works on 'ALens'.
+(#%=) :: MonadState s m => ALens s s a b -> (a -> b) -> m ()
 l #%= f = modify (l #%~ f)
-{-# INLINE ( #%= ) #-}
+{-# INLINE (#%=) #-}
 
--- | A version of ('<%~') that works on 'R_ALens'.
+-- | A version of ('<%~') that works on 'ALens'.
 --
 -- >>> ("hello","world") & _2 <#%~ length
 -- (5,("hello",5))
-(<#%~) :: R_ALens s t a b -> (a -> b) -> s -> (b, t)
-l <#%~ f = \s -> runPretext (l sell s) $ \a -> let b = f a in (b, b)
+(<#%~) :: ALens s t a b -> (a -> b) -> s -> (b, t)
+l <#%~ f = \s -> runPretext (runOptic l sell s) $ \a -> let b = f a in (b, b)
 {-# INLINE (<#%~) #-}
 
--- | A version of ('<%=') that works on 'R_ALens'.
-(<#%=) :: MonadState s m => R_ALens s s a b -> (a -> b) -> m b
+-- | A version of ('<%=') that works on 'ALens'.
+(<#%=) :: MonadState s m => ALens s s a b -> (a -> b) -> m b
 l <#%= f = l #%%= \a -> let b = f a in (b, b)
 {-# INLINE (<#%=) #-}
 
--- | A version of ('%%=') that works on 'R_ALens'.
-( #%%= ) :: MonadState s m => R_ALens s s a b -> (a -> (r, b)) -> m r
+-- | A version of ('%%=') that works on 'ALens'.
+(#%%=) :: MonadState s m => ALens s s a b -> (a -> (r, b)) -> m r
 #if MIN_VERSION_mtl(2,1,1)
-l #%%= f = State.state $ \s -> runPretext (l sell s) f
+l #%%= f = State.state $ \s -> runPretext (runOptic l sell s) f
 #else
 l #%%= f = do
-  p <- State.gets (l sell)
+  p <- State.gets (runOptic l sell)
   let (r, t) = runPretext p f
   State.put t
   return r
 #endif
-{-# INLINE ( #%%= ) #-}
+{-# INLINE (#%%=) #-}
 
--- | A version of ('Control.R_Lens.R_Setter.<.~') that works on 'R_ALens'.
+-- | A version of ('Control.Lens.Setter.<.~') that works on 'ALens'.
 --
 -- >>> ("hello","there") & _2 <#~ "world"
 -- ("world",("hello","world"))
-(<#~) :: R_ALens s t a b -> b -> s -> (b, t)
+(<#~) :: ALens s t a b -> b -> s -> (b, t)
 l <#~ b = \s -> (b, storing l b s)
 {-# INLINE (<#~) #-}
 
--- | A version of ('Control.R_Lens.R_Setter.<.=') that works on 'R_ALens'.
-(<#=) :: MonadState s m => R_ALens s s a b -> b -> m b
+-- | A version of ('Control.Lens.Setter.<.=') that works on 'ALens'.
+(<#=) :: MonadState s m => ALens s s a b -> b -> m b
 l <#= b = do
   l #= b
   return b
@@ -1497,10 +1519,10 @@ l <#= b = do
 -- Nothing
 --
 -- @
--- 'devoid' :: 'R_Lens'' 'Void' a
+-- 'devoid' :: 'Lens'' 'Void' a
 -- @
-devoid :: R_Over p f Void Void a b
-devoid _ = absurd
+devoid :: Over p f Void Void a b
+devoid = Optic (const absurd)
 {-# INLINE devoid #-}
 
 -- | We can always retrieve a @()@ from any type.
@@ -1510,8 +1532,8 @@ devoid _ = absurd
 --
 -- >>> "hello" & united .~ ()
 -- "hello"
-united :: R_Lens' a ()
-united f v = f () <&> \ () -> v
+united :: Lens' a ()
+united = Optic (\f v -> f () <&> \() -> v)
 {-# INLINE united #-}
 
 -- | Fuse a composition of lenses using 'Yoneda' to provide 'fmap' fusion.
@@ -1527,12 +1549,35 @@ united f v = f () <&> \ () -> v
 -- 'fusing' exploits the 'Yoneda' lemma to merge these separate uses into a single 'fmap'.
 --
 -- This is particularly effective when the choice of functor 'f' is unknown at compile
--- time or when the 'R_Lens' @foo.bar@ in the above description is recursive or complex
+-- time or when the 'Lens' @foo.bar@ in the above description is recursive or complex
 -- enough to prevent inlining.
 --
 -- @
--- 'fusing' :: 'R_Lens' s t a b -> 'R_Lens' s t a b
+-- 'fusing' :: 'Lens' s t a b -> 'Lens' s t a b
 -- @
-fusing :: Functor f => R_LensLike (Yoneda f) s t a b -> R_LensLike f s t a b
-fusing t = \f -> lowerYoneda . t (liftYoneda . f)
+fusing :: Functor f => LensLike (Yoneda f) s t a b -> LensLike f s t a b
+fusing t = Optic (\f -> lowerYoneda . runOptic t (liftYoneda . f))
 {-# INLINE fusing #-}
+
+-- class Foo a b where t :: a -> b
+
+-- instance (a ~ b) => Foo a b where t = id
+
+-- foo :: Char
+-- foo = let b = 'b' :: Foo Char Char => Char in b
+
+-- foo' :: Char
+-- foo' = let b = 'b' :: Foo Int Char => Char in b
+
+-- type family BarMatch a b :: Constraint where
+--   BarMatch a a = ()
+--   BarMatch a b = TypeError (Text "uwu fucky wucky etc")
+
+-- class Bar a b
+-- instance (a ~ b, BarMatch a b) => Bar a b
+
+-- bar :: Bar Int Int => Char
+-- bar = 'a'
+
+-- bar' :: Char
+-- bar' = let b = 'b' :: Bar Int Char => Char in b
