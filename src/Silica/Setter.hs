@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -19,7 +20,11 @@
 --
 -- A @'Setter' s t a b@ is a generalization of 'fmap' from 'Functor'. It allows you to map into a
 -- structure and change out the contents, but it isn't strong enough to allow you to
--- enumerate those contents. Starting with @'fmap' :: 'Functor' f => (a -> b) -> f a -> f b@
+-- enumerate those contents. 
+--
+-- = Where the type comes from
+--
+-- Starting with @'fmap' :: 'Functor' f => (a -> b) -> f a -> f b@
 -- we monomorphize the type to obtain @(a -> b) -> s -> t@ and then decorate it with 'Data.Functor.Identity.Identity' to obtain:
 --
 -- @
@@ -34,17 +39,19 @@
 module Silica.Setter
   (
   -- * Setters
-    R_Setter, R_Setter'
+    Setter, Setter'
+  , IndexedSetter, IndexedSetter'
+  , R_Setter, R_Setter'
   , R_IndexedSetter, R_IndexedSetter'
-  , R_ASetter, R_ASetter'
-  , R_AnIndexedSetter, R_AnIndexedSetter'
+  -- , R_ASetter, R_ASetter'
+  -- , R_AnIndexedSetter, R_AnIndexedSetter'
   , Setting, Setting'
   -- * Building Setters
-  , sets
-  , gsets, setting
-  , cloneSetter
-  , cloneR_IndexPreservingSetter
-  , cloneIndexedSetter
+  , sets , usets, gsets
+  , setting
+  -- , cloneSetter
+  -- , cloneR_IndexPreservingSetter
+  -- , cloneIndexedSetter
   -- * Common Setters
   , mapped, lifted
   , contramapped
@@ -66,16 +73,14 @@ module Silica.Setter
   -- * Simplified State Setting
   , set'
   -- * Indexed Setters
-  , imapOf, iover, iset, imodifying
+  , iover, iset, imodifying
   , isets
   , (%@~), (.@~), (%@=), (.@=)
   -- * Arrow operators
   , assignA
-  -- * Exported for legible error messages
-  , Settable
-  , Identity(..)
   -- * Deprecated
   , mapOf
+  , imapOf
   ) where
 
 import Control.Applicative
@@ -127,7 +132,6 @@ infixr 2 <~
 --
 -- When consuming a setter directly to perform a mapping, you can use this type, but most
 -- user code will not need to use this type.
-type R_ASetter s t a b = (a -> Identity b) -> s -> Identity t
 type ASetter s t a b = LensLike Identity s t a b
 
 -- | This is a useful alias for use when consuming a 'Setter''.
@@ -137,20 +141,17 @@ type ASetter s t a b = LensLike Identity s t a b
 -- @
 -- type 'ASetter'' = 'Simple' 'ASetter'
 -- @
-type R_ASetter' s a = R_ASetter s s a a
 type ASetter' s a = ASetter s s a a
 
 -- | Running an 'IndexedSetter' instantiates it to a concrete type.
 --
 -- When consuming a setter directly to perform a mapping, you can use this type, but most
 -- user code will not need to use this type.
-type R_AnIndexedSetter i s t a b = Indexed i a (Identity b) -> s -> Identity t
 type AnIndexedSetter i s t a b = Over (Indexed i) Identity s t a b
 
 -- | @
 -- type 'AnIndexedSetter'' i = 'Simple' ('AnIndexedSetter' i)
 -- @
-type R_AnIndexedSetter' i s a = R_AnIndexedSetter i s s a a
 type AnIndexedSetter' i s a = Over (Indexed i) Identity s s a a
 
 -- | This is a convenient alias when defining highly polymorphic code that takes both
@@ -283,40 +284,57 @@ argument = sets lmap
 -- @
 -- 'setting' :: ((a -> b) -> s -> t) -> 'Setter' s t a b
 -- @
-setting :: ((a -> b) -> s -> t) -> R_IndexPreservingSetter s t a b
-setting l pafb = cotabulate $ \ws -> pure $ l (\a -> untainted (cosieve pafb (a <$ ws))) (extract ws)
+
+setting :: ((a -> b) -> s -> t) -> Setter s t a b
+setting = usetting
 {-# INLINE setting #-}
+
+usetting :: ((a -> b) -> s -> t) -> Setter s t a b
+usetting = psetting
+{-# INLINE usetting #-}
+
+xsetting :: ((a -> b) -> s -> t) -> IndexPreservingSetter s t a b
+xsetting l = Optic (rsetting l)
+{-# INLINE xsetting #-}
+
+gsetting :: ((a -> b) -> s -> t) -> IndexPreservingSetter s t a b
+gsetting = xsetting
+{-# INLINE gsetting #-}
+
+psetting
+  :: (A_IndexPreserving A_Setter <: k)
+  => ((a -> b) -> s -> t)
+  -> Optic k s t a b
+psetting l = sub (xsetting l)
+{-# INLINE psetting #-}
+
+rsetting :: ((a -> b) -> s -> t) -> R_IndexPreservingSetter s t a b
+rsetting l pafb = cotabulate
+  $ \ws -> pure $ l (\a -> untainted (cosieve pafb (a <$ ws))) (extract ws)
+{-# INLINE rsetting #-}
 
 -- | Build a 'R_Setter', 'R_IndexedSetter' or 'R_IndexPreservingSetter' depending on your choice of 'Profunctor'.
 --
 -- @
 -- 'gsets' :: ((a -> b) -> s -> t) -> 'R_Setter' s t a b
 -- @
-gsets :: (Profunctor p, Profunctor q, Settable f) => (p a b -> q s t) -> R_Optical p q f s t a b
-gsets f g = taintedDot (f (untaintedDot g))
-{-# INLINE gsets #-}
 
 -- | Build a 'Setter'.
 sets :: ((a -> b) -> s -> t) -> Setter s t a b
-sets f = Optic (gsets f)
+sets = usets
 {-# INLINE sets #-}
 
--- | Restore 'ASetter' to a full 'Setter'.
-cloneSetter :: R_ASetter s t a b -> Setter s t a b
-cloneSetter l = Optic (\afb -> taintedDot $ runIdentity #. l (Identity #. untaintedDot afb))
-{-# INLINE cloneSetter #-}
+usets :: ((a -> b) -> s -> t) -> Setter s t a b
+usets f = Optic (rsets f)
+{-# INLINE usets #-}
 
--- | Build an 'IndexPreservingSetter' from any 'Setter'.
-cloneR_IndexPreservingSetter :: R_ASetter s t a b -> R_IndexPreservingSetter s t a b
-cloneR_IndexPreservingSetter l pafb = cotabulate $ \ws ->
-    taintedDot runIdentity $ l (\a -> Identity (untainted (cosieve pafb (a <$ ws)))) (extract ws)
-{-# INLINE cloneR_IndexPreservingSetter #-}
+gsets :: (Profunctor p, Profunctor q, Settable f) => (p a b -> q s t) -> Optical p q f s t a b
+gsets f = Optic (rsets f)
+{-# INLINE gsets #-}
 
--- | Clone an 'IndexedSetter'.
-cloneIndexedSetter :: R_AnIndexedSetter i s t a b -> IndexedSetter i s t a b
-cloneIndexedSetter l = 
-  Optic (\pafb -> taintedDot (runIdentity #. l (Indexed $ \i -> Identity #. untaintedDot (indexed pafb i))))
-{-# INLINE cloneIndexedSetter #-}
+rsets :: (Profunctor p, Profunctor q, Settable f) => (p a b -> q s t) -> R_Optical p q f s t a b
+rsets f g = taintedDot (f (untaintedDot g))
+{-# INLINE rsets #-}
 
 -----------------------------------------------------------------------------
 -- Using Setters
@@ -366,17 +384,14 @@ over :: AsSetter k => Optic k s t a b -> (a -> b) -> s -> t
 over l f = runIdentity #. runSetter l (Identity #. f)
 {-# INLINE over #-}
 
-toSetter :: (k <: A_Setter) => Optic k s t a b -> Setter s t a b
-toSetter = sub
+asSetter :: AsSetter k => Optic k s t a b -> Setter s t a b
+asSetter = sub
 
-runSetter :: (k <: A_Setter) => Optic k s t a b -> R_Setter s t a b
-runSetter = runOptic . toSetter
+runSetter :: AsSetter k => Optic k s t a b -> R_Setter s t a b
+runSetter = runOptic . asSetter
 
-toIndexedSetter :: (k <: A_Indexed i A_Setter) => Optic k s t a b -> IndexedSetter i s t a b
-toIndexedSetter = sub
-
--- runIndexedSetter :: (k <: A_Indexed i A_Setter) => Optic k s t a b -> IndexedSetter i s t a b
--- runIndexedSetter = runOptic . toIndexedSetter
+asIndexedSetter :: AsIndexedSetter i k => Optic k s t a b -> IndexedSetter i s t a b
+asIndexedSetter = sub
 
 -- | Replace the target of a 'Lens' or all of the targets of a 'Setter'
 -- or 'Traversal' with a constant value.
@@ -427,7 +442,7 @@ set l b = runIdentity #. runSetter l (\_ -> Identity b)
 -- 'set'' :: 'Lens'' s a      -> a -> s -> s
 -- 'set'' :: 'Traversal'' s a -> a -> s -> s
 -- @
-set' :: Setter' s a -> a -> s -> s
+set' :: AsSetter k => Optic' k s a -> a -> s -> s
 set' l b = runIdentity #. runSetter l (\_ -> Identity b)
 {-# INLINE set' #-}
 
@@ -1152,7 +1167,7 @@ icensoring l uv = censor (iover l uv)
 -- 'iover' :: 'IndexedTraversal' i s t a b -> (i -> a -> b) -> s -> t
 -- @
 iover :: AsIndexedSetter i k => Optic k s t a b -> (i -> a -> b) -> s -> t
-iover l f = runIdentity #. runOptic (toIndexedSetter l) (Identity #. Indexed f)
+iover l f = runIdentity #. runOptic (asIndexedSetter l) (Identity #. Indexed f)
 {-# INLINE iover #-}
 
 -- | Set with index. Equivalent to 'iover' with the current value ignored.
@@ -1191,7 +1206,7 @@ iset l = iover l . (const .)
 -- Another way to view 'isets' is that it takes a \"semantic editor combinator\"
 -- which has been modified to carry an index and transforms it into a 'IndexedSetter'.
 isets :: ((i -> a -> b) -> s -> t) -> IndexedSetter i s t a b
-isets f = Optic (gsets (f . indexed))
+isets f = Optic (rsets (f . indexed))
 {-# INLINE isets #-}
 
 -- | Adjust every target of an 'IndexedSetter', 'IndexedLens' or 'IndexedTraversal'
@@ -1235,7 +1250,7 @@ isets f = Optic (gsets (f . indexed))
 -- ('.@~') :: 'IndexedTraversal' i s t a b -> (i -> b) -> s -> t
 -- @
 (.@~) :: AsIndexedSetter i k => Optic k s t a b -> (i -> b) -> s -> t
-l .@~ f = runIdentity #. runOptic (toIndexedSetter l) (Identity #. Indexed (const . f))
+l .@~ f = runIdentity #. runOptic (asIndexedSetter l) (Identity #. Indexed (const . f))
 {-# INLINE (.@~) #-}
 
 -- | Adjust every target in the current state of an 'IndexedSetter', 'IndexedLens' or 'IndexedTraversal'
@@ -1341,3 +1356,21 @@ imapOf :: AsIndexedSetter i k => Optic k s t a b -> (i -> a -> b) -> s -> t
 imapOf = iover
 {-# INLINE imapOf #-}
 {-# DEPRECATED imapOf "Use `iover`" #-}
+
+-- -- | Restore 'ASetter' to a full 'Setter'.
+-- cloneSetter :: R_ASetter s t a b -> Setter s t a b
+-- cloneSetter l = Optic (\afb -> taintedDot $ runIdentity #. l (Identity #. untaintedDot afb))
+-- {-# INLINE cloneSetter #-}
+
+-- -- | Build an 'IndexPreservingSetter' from any 'Setter'.
+-- cloneR_IndexPreservingSetter :: R_ASetter s t a b -> R_IndexPreservingSetter s t a b
+-- cloneR_IndexPreservingSetter l pafb = cotabulate $ \ws ->
+--     taintedDot runIdentity $ l (\a -> Identity (untainted (cosieve pafb (a <$ ws)))) (extract ws)
+-- {-# INLINE cloneR_IndexPreservingSetter #-}
+
+-- -- | Clone an 'IndexedSetter'.
+-- cloneIndexedSetter :: R_AnIndexedSetter i s t a b -> IndexedSetter i s t a b
+-- cloneIndexedSetter l = 
+--   Optic (\pafb -> taintedDot (runIdentity #. l (Indexed $ \i -> Identity #. untaintedDot (indexed pafb i))))
+-- {-# INLINE cloneIndexedSetter #-}
+

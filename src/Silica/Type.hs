@@ -655,6 +655,7 @@ data A_Getting (r :: Type)
 data A_LensLike (p :: Type -> Type)
 data A_Over (p :: Type -> Type -> Type) (f :: Type -> Type)
 data A_Optical (p :: Type -> Type -> Type) (q :: Type -> Type -> Type) (f :: Type -> Type)
+data A_Proptic (p :: Type -> Type -> Type) (f :: Type -> Type)
 
 data A_Indexed (i :: Type) (o :: Type)
 data A_IndexPreserving (o :: Type)
@@ -753,10 +754,12 @@ type Iso'                  s   a   = Iso                               s s a a
 type LensLike            f s t a b = Optic  (A_LensLike f)             s t a b
 type Over            p   f s t a b = Optic  (A_Over p f)               s t a b
 type Optical         p q f s t a b = Optic  (A_Optical p q f)          s t a b
+type Proptic         p   f s t a b = Optic  (A_Proptic p f)            s t a b
 
 type LensLike'           f s   a   = LensLike                        f s s a a
 type Over'           p   f s   a   = Over                        p   f s s a a
 type Optical'        p q f s   a   = Optical                     p q f s s a a
+type Proptic'        p   f s   a   = Proptic                     p   f s s a a
 
 -- indexed
 
@@ -764,7 +767,7 @@ type IndexedLens          i   s t a b = Optic  (A_Indexed i A_Lens)          s t
 type IndexedTraversal     i   s t a b = Optic  (A_Indexed i A_Traversal)     s t a b
 type IndexedTraversal1    i   s t a b = Optic  (A_Indexed i A_Traversal)     s t a b
 type IndexedSetter        i   s t a b = Optic  (A_Indexed i A_Setter)        s t a b
-type IndexedGetter        i   s t a b = Optic  (A_Indexed i A_Getter)        s t a b
+type IndexedGetter        i   s   a   = Optic' (A_Indexed i A_Getter)        s   a
 
 type IndexedGetting       i r s   a   = Optic' (A_Indexed i (A_Getting r))   s   a
 type IndexedFold          i   s   a   = Optic' (A_Indexed i A_Fold)          s   a
@@ -784,7 +787,7 @@ type IndexPreservingLens            s t a b = Optic  (A_IndexPreserving A_Lens) 
 type IndexPreservingTraversal       s t a b = Optic  (A_IndexPreserving A_Traversal)     s t a b
 type IndexPreservingTraversal1      s t a b = Optic  (A_IndexPreserving A_Traversal)     s t a b
 type IndexPreservingSetter          s t a b = Optic  (A_IndexPreserving A_Setter)        s t a b
-type IndexPreservingGetter          s t a b = Optic  (A_IndexPreserving A_Getter)        s t a b
+type IndexPreservingGetter          s   a   = Optic' (A_IndexPreserving A_Getter)        s   a
 
 -- type IndexPreservingGetting       r s   a   = Optic' (A_IndexPreserving (A_Getting r))   s   a
 type IndexPreservingFold            s   a   = Optic' (A_IndexPreserving A_Fold)          s   a
@@ -843,6 +846,7 @@ type instance Cts A_Prism                  p q f = (p ~ q, Choice p, Applicative
 type instance Cts A_Setter                 p q f = (Fn2 p q, Settable f)
 
 type instance Cts A_Lens                   p q f = (Fn2 p q, Functor f)
+
 type instance Cts A_Getter                 p q f = (Fn2 p q, Contravariant f, Functor f)
 
 type instance Cts A_Traversal              p q f = (Fn2 p q, Applicative f)
@@ -856,6 +860,7 @@ type instance Cts (A_Getting r)            p q f = (Fn2 p q, f ~ Const r)
 type instance Cts (A_LensLike f')          p q f = (Fn2 p q, f ~ f')
 type instance Cts (A_Over p' f')           p q f = (Fn q, p ~ p', f ~ f')
 type instance Cts (A_Optical p' q' f')     p q f = (p ~ p', q ~ q', f ~ f')
+type instance Cts (A_Proptic p'    f')     p q f = (p ~ p', p ~ q, f ~ f')
 
 type instance Cts (A_Indexed i (A_LensLike g))           p q f = (Fn q, f ~ g, Indexable i p)
 
@@ -863,6 +868,7 @@ type instance Cts (A_Indexed i A_Lens)        p q f = (Fn q, Indexable i p, Func
 type instance Cts (A_Indexed i A_Traversal)   p q f = (Fn q, Indexable i p, Applicative f)
 type instance Cts (A_Indexed i A_Setter)      p q f = (Fn q, Indexable i p, Settable f)
 type instance Cts (A_Indexed i A_Fold)        p q f = (Fn q, Indexable i p, Contravariant f, Applicative f)
+type instance Cts (A_Indexed i A_Getter)        p q f = (Fn q, Indexable i p, Contravariant f, Applicative f)
 type instance Cts (A_Indexed i (A_Getting r)) p q f = (Fn q, p ~ Indexed i, f ~ Const r)
 
 type instance Cts (A_IndexPreserving A_Lens) p q f = (p ~ q, Conjoined p, Functor f)
@@ -991,6 +997,12 @@ instance (p ~ (->), f ~ g, LensLikeCt f g) => A_Over p f <: A_LensLike g where i
 instance (p ~ (->), f ~ g, LensLikeCt f g) => A_LensLike f <: A_Over p g where implies _ r = r
 
 instance (f ~ g, LensLikeCt f g) => A_LensLike f <: A_LensLike g where implies _ r = r
+
+instance A_IndexPreserving A_Setter <: A_Setter where implies _ r = r
+
+instance A_IndexPreserving A_Setter <: A_IndexPreserving A_Setter where implies _ r = r
+
+instance cr ~ Const r => A_Getting r <: A_LensLike cr where implies _ r = r
 
 type family LensLikeCt f g :: Constraint where
   LensLikeCt f f = ()
@@ -1146,11 +1158,36 @@ type AsFold                o = o <: A_Fold
 type AsFold1               o = o <: A_Fold1
 type AsSetter              o = o <: A_Setter
 type AsIndexedSetter i     o = o <: A_Indexed i A_Setter
+type AsIndexedGetter i     o = o <: A_Indexed i A_Getter
 type AsGetter              o = o <: A_Getter
 type AsLensLike f          o = o <: A_LensLike f
 type AsIndexedLensLike i f o = o <: A_Indexed i (A_LensLike f)
-type AsOver p f            o = o <: A_Over p f
 type AsGetting r           o = o <: A_Getting r
+type AsIndexedGetting i r           o = o <: A_Indexed i (A_Getting r)
 
 type Squashing r o = o <: A_Getting (Endo r)
+
+type AsOver p f            o = o <: A_Over p f
+type AsOptical p q f       o = o <: A_Optical p q f
+type AsProptic p f         o = o <: A_Proptic p f
+
+asOver :: AsOver p f k => Optic k s t a b -> Over p f s t a b
+asOver = sub
+
+runOver :: AsOver p f k => Optic k s t a b -> R_Over p f s t a b
+runOver = runOptic . asOver
+
+asLensLike :: AsLensLike f k => Optic k s t a b -> LensLike f s t a b
+asLensLike = sub
+
+runLensLike :: AsLensLike f k => Optic k s t a b -> R_LensLike f s t a b
+runLensLike = runOptic . asLensLike
+
+asLensLikePair :: AsLensLike ((,) b) k => Optic k s t a b -> LensLike ((,) b) s t a b
+asLensLikePair = sub
+
+-- | Explicitly cast an optic to a lens.
+asLens :: AsLens o => Optic o s t a b -> Lens s t a b
+asLens = sub
+{-# INLINE asLens #-}
 

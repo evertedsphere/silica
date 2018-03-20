@@ -42,6 +42,33 @@
 -- <http://github.com/ekmett/lens/wiki>
 --
 -- <<Hierarchy.png>>
+--
+-- Optic-creating functions:
+--
+-- For people used to the original `lens` library:
+--
+-- @
+-- r (raw)         : raw van Laarhoven lens
+-- g (general)     : newtyped, most general monomorphic type (use `sub` or a `toFooOptic` function to change)
+--                   (provided for consistency; usually this is an indexed or index-preserving optic 
+--                   so it will be one of the i- or ip- versions)
+-- p (polymorphic) : newtyped, polymorphic (can be instantiated at any supertype)
+-- @
+--
+-- Prefixes for recommended API (all newtyped, monomorphic):
+--
+-- @
+-- [no prefix]    : vanilla/unindexed  - most "sensible" type (no 'Over' or 'Optical')
+-- i              : indexed            - using extra @i ->@ argument
+-- ip             : index-preserving   - 
+-- @
+--
+-- @
+-- gfoo ::               ... -> FooOptic s t a b
+-- pfoo :: A_Foo \<: k => ... -> Optic k s t a b
+-- rfoo ::               ... -> R_FooOptic s t a b
+-- @
+
 ----------------------------------------------------------------------------
 module Silica
   ( 
@@ -51,10 +78,10 @@ module Silica
   -- , module Silica.Empty
   -- , module Silica.Equality
   -- , module Silica.Fold
-  -- , module Silica.Getter
+    module Silica.Getter
   -- , module Silica.Indexed
   -- , module Silica.Iso
-    module Silica.Lens
+  , module Silica.Lens
   -- , module Silica.Level
   -- , module Silica.Plated
   -- , module Silica.Prism
@@ -62,7 +89,7 @@ module Silica
   -- , module Silica.Review
   , module Silica.Setter
   -- , module Silica.Traversal
-  -- , module Silica.Tuple
+  , module Silica.Tuple
   , module Silica.Type
   -- , module Silica.Wrapped
   -- , module Silica.Zoom
@@ -74,7 +101,7 @@ module Silica
 -- import Silica.Empty
 -- import Silica.Equality
 -- import Silica.Fold
--- import Silica.Getter
+import Silica.Getter
 -- import Silica.Indexed
 -- import Silica.Iso
 import Silica.Lens
@@ -85,7 +112,7 @@ import Silica.Lens
 -- import Silica.Review
 import Silica.Setter
 -- import Silica.Traversal
--- import Silica.Tuple
+import Silica.Tuple
 import Silica.Type
 -- import Silica.Wrapped
 -- import Silica.Zoom

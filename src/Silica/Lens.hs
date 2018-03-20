@@ -72,7 +72,10 @@ module Silica.Lens
   , IndexedLens, IndexedLens'
 
   -- * Combinators
-  , lens, ilens, iplens
+  , lens, ulens
+  , ilens, iplens
+
+  , fromRawLens
   , (%%~), (%%=)
   , (%%@~), (%%@=)
   , (<%@~), (<%@=)
@@ -197,30 +200,10 @@ type AnIndexedLens i s t a b = Optical (Indexed i) (->) (Pretext (Indexed i) a b
 -- @
 type AnIndexedLens' i s a  = AnIndexedLens i s s a a
 
-toOver :: AsOver p f k => Optic k s t a b -> Over p f s t a b
-toOver = sub
-
-runOver :: AsOver p f k => Optic k s t a b -> R_Over p f s t a b
-runOver = runOptic . toOver
-
-toLensLike :: AsLensLike f k => Optic k s t a b -> LensLike f s t a b
-toLensLike = sub
-
-runLensLike :: AsLensLike f k => Optic k s t a b -> R_LensLike f s t a b
-runLensLike = runOptic . toLensLike
-
-toLensLikePair :: AsLensLike ((,) b) k => Optic k s t a b -> LensLike ((,) b) s t a b
-toLensLikePair = sub
-
 -- | Explicitly cast an optic to a lens.
-toLens :: AsLens o => Optic o s t a b -> Lens s t a b
-toLens = sub
-{-# INLINE toLens #-}
-
--- | Explicitly cast an optic to a lens.
-toALens :: (o <: A_LensLike (Pretext (->) a b)) => Optic o s t a b -> ALens s t a b
-toALens = sub
-{-# INLINE toALens #-}
+asALens :: (o <: A_LensLike (Pretext (->) a b)) => Optic o s t a b -> ALens s t a b
+asALens = sub
+{-# INLINE asALens #-}
 
 --------------------------
 -- Constructing Lenses
@@ -242,8 +225,12 @@ toALens = sub
 -- setter s (f (getter s))
 --
 lens :: (s -> a) -> (s -> b -> t) -> Lens s t a b
-lens sa sbt = fromRawLens (\afb s -> sbt s <$> afb (sa s))
+lens = ulens
 {-# INLINE lens #-}
+
+ulens :: (s -> a) -> (s -> b -> t) -> Lens s t a b
+ulens sa sbt = fromRawLens (\afb s -> sbt s <$> afb (sa s))
+{-# INLINE ulens #-}
 
 -- | Build an 'IndexedLens' from a 'Control.Lens.Getter.Getter' and
 -- a 'Control.Lens.Setter.Setter'.
@@ -328,7 +315,7 @@ s &~ l = execState l s
 -- @
 
 (%%=) :: (MonadState s m, AsOver p ((,) r) k) => Optic k s s a b -> p a (r, b) -> m r
-l %%= f = State.state (runOptic (toOver l) f)
+l %%= f = State.state (runOptic (asOver l) f)
 {-# INLINE (%%=) #-}
 
 -- | Build a lens from the van Laarhoven representation.
@@ -430,7 +417,7 @@ fab ?? a = fmap ($ a) fab
 inside :: (Corepresentable p, AsLens k) => Optic k s t a b -> Lens (p e s) (p e t) (p e a) (p e b)
 inside l0 = Optic $ \f es -> 
      let 
-        l = toALens (toLens l0)
+        l = asALens (asLens l0)
         i = cotabulate $ \e -> ipos $ runOptic l sell (cosieve es e)
         o ea = cotabulate $ \e -> ipeek (cosieve ea e) $ runOptic l sell (cosieve es e)
      in o <$> f i
@@ -926,7 +913,7 @@ l <<<>~ b = runLensLike l $ \a -> (a, a `mappend` b)
 -- ('<%=') :: ('MonadState' s m, 'Monoid' a) => 'Control.Lens.Traversal.Traversal'' s a -> (a -> a) -> m a
 -- @
 (<%=) :: forall s m k a b. (MonadState s m, AsLensLike ((,) b) k) => Optic k s s a b -> (a -> b) -> m b
-l <%= f = toLensLikePair l %%= (\b -> (b, b)) . f
+l <%= f = asLensLikePair l %%= (\b -> (b, b)) . f
 {-# INLINE (<%=) #-}
 
 
@@ -1083,7 +1070,7 @@ l <<%= f = l %%= lmap (\a -> (a,a)) (second' f)
 -- ('<<.=') :: ('MonadState' s m, 'Monoid' a) => 'Control.Lens.Traversal.Traversal'' s a -> a -> m a
 -- @
 (<<.=) :: (MonadState s m, AsLensLike ((,) a) k) => Optic k s s a b -> b -> m a
-l <<.= b = toLensLike l %%= \a -> (a,b)
+l <<.= b = asLensLike l %%= \a -> (a,b)
 {-# INLINE (<<.=) #-}
 
 -- | Replace the target of a 'Lens' into your 'Monad''s state with 'Just' a user supplied
@@ -1113,7 +1100,7 @@ l <<?= b = l <<.= Just b
 -- ('<<+=') :: ('MonadState' s m, 'Num' a) => 'Iso'' s a -> a -> m a
 -- @
 (<<+=) :: (MonadState s m, Num a, AsLensLike ((,) a) k) => Optic' k s a -> a -> m a
-l <<+= n = toLensLike l %%= \a -> (a, a + n)
+l <<+= n = asLensLike l %%= \a -> (a, a + n)
 {-# INLINE (<<+=) #-}
 
 -- | Modify the target of a 'Lens' into your 'Monad''s state by subtracting a value
@@ -1126,7 +1113,7 @@ l <<+= n = toLensLike l %%= \a -> (a, a + n)
 -- ('<<-=') :: ('MonadState' s m, 'Num' a) => 'Iso'' s a -> a -> m a
 -- @
 (<<-=) :: (MonadState s m, Num a, AsLensLike ((,) a) k) => Optic' k s a -> a -> m a
-l <<-= n = toLensLike l %%= \a -> (a, a - n)
+l <<-= n = asLensLike l %%= \a -> (a, a - n)
 {-# INLINE (<<-=) #-}
 
 -- | Modify the target of a 'Lens' into your 'Monad''s state by multipling a value
@@ -1139,7 +1126,7 @@ l <<-= n = toLensLike l %%= \a -> (a, a - n)
 -- ('<<*=') :: ('MonadState' s m, 'Num' a) => 'Iso'' s a -> a -> m a
 -- @
 (<<*=) :: (MonadState s m, Num a, AsLensLike ((,) a) k) => Optic' k s a -> a -> m a
-l <<*= n = toLensLike l %%= \a -> (a, a * n)
+l <<*= n = asLensLike l %%= \a -> (a, a * n)
 {-# INLINE (<<*=) #-}
 
 -- | Modify the target of a 'Lens' into your 'Monad'\s state by dividing by a value
@@ -1152,7 +1139,7 @@ l <<*= n = toLensLike l %%= \a -> (a, a * n)
 -- ('<<//=') :: ('MonadState' s m, 'Fractional' a) => 'Iso'' s a -> a -> m a
 -- @
 (<<//=) :: (MonadState s m, Fractional a, AsLensLike ((,) a) k) => Optic' k s a -> a -> m a
-l <<//= n = toLensLike l %%= \a -> (a, a / n)
+l <<//= n = asLensLike l %%= \a -> (a, a / n)
 {-# INLINE (<<//=) #-}
 
 -- | Modify the target of a 'Lens' into your 'Monad''s state by raising it by a non-negative power
@@ -1165,7 +1152,7 @@ l <<//= n = toLensLike l %%= \a -> (a, a / n)
 -- ('<<^=') :: ('MonadState' s m, 'Num' a, 'Integral' e) => 'Iso'' s a -> a -> m a
 -- @
 (<<^=) :: (MonadState s m, Num a, Integral e, AsLensLike ((,) a) k) => Optic' k s a -> e -> m a
-l <<^= n = toLensLike l %%= \a -> (a, a ^ n)
+l <<^= n = asLensLike l %%= \a -> (a, a ^ n)
 {-# INLINE (<<^=) #-}
 
 -- | Modify the target of a 'Lens' into your 'Monad''s state by raising it by an integral power
@@ -1178,7 +1165,7 @@ l <<^= n = toLensLike l %%= \a -> (a, a ^ n)
 -- ('<<^^=') :: ('MonadState' s m, 'Fractional' a, 'Integral' e) => 'Iso'' s a -> e -> m a
 -- @
 (<<^^=) :: (MonadState s m, Fractional a, Integral e, AsLensLike ((,) a) k) => Optic' k s a -> e -> m a
-l <<^^= n = toLensLike l %%= \a -> (a, a ^^ n)
+l <<^^= n = asLensLike l %%= \a -> (a, a ^^ n)
 {-# INLINE (<<^^=) #-}
 
 -- | Modify the target of a 'Lens' into your 'Monad''s state by raising it by an arbitrary power
@@ -1191,7 +1178,7 @@ l <<^^= n = toLensLike l %%= \a -> (a, a ^^ n)
 -- ('<<**=') :: ('MonadState' s m, 'Floating' a) => 'Iso'' s a -> a -> m a
 -- @
 (<<**=) :: (MonadState s m, Floating a, AsLensLike ((,) a) k) => Optic' k s a -> a -> m a
-l <<**= n = toLensLike l %%= \a -> (a, a ** n)
+l <<**= n = asLensLike l %%= \a -> (a, a ** n)
 {-# INLINE (<<**=) #-}
 
 -- | Modify the target of a 'Lens' into your 'Monad''s state by taking its logical '||' with a value
@@ -1204,7 +1191,7 @@ l <<**= n = toLensLike l %%= \a -> (a, a ** n)
 -- ('<<||=') :: 'MonadState' s m => 'Iso'' s 'Bool' -> 'Bool' -> m 'Bool'
 -- @
 (<<||=) :: (MonadState s m, AsLensLike ((,) Bool) k) => Optic' k s Bool -> Bool -> m Bool
-l <<||= b = toLensLike l %%= \a -> (a, a || b)
+l <<||= b = asLensLike l %%= \a -> (a, a || b)
 {-# INLINE (<<||=) #-}
 
 -- | Modify the target of a 'Lens' into your 'Monad''s state by taking its logical '&&' with a value
@@ -1217,7 +1204,7 @@ l <<||= b = toLensLike l %%= \a -> (a, a || b)
 -- ('<<&&=') :: 'MonadState' s m => 'Iso'' s 'Bool' -> 'Bool' -> m 'Bool'
 -- @
 (<<&&=) :: (MonadState s m, AsLensLike ((,) Bool) k) => Optic' k s Bool -> Bool -> m Bool
-l <<&&= b = toLensLike l %%= \a -> (a, a && b)
+l <<&&= b = asLensLike l %%= \a -> (a, a && b)
 {-# INLINE (<<&&=) #-}
 
 -- | Modify the target of a 'Lens' into your 'Monad''s state by 'mappend'ing a value
@@ -1230,7 +1217,7 @@ l <<&&= b = toLensLike l %%= \a -> (a, a && b)
 -- ('<<<>=') :: ('MonadState' s m, 'Monoid' r) => 'Iso'' s r -> r -> m r
 -- @
 (<<<>=) :: (MonadState s m, Monoid r, AsLensLike ((,) r) k) => Optic' k s r -> r -> m r
-l <<<>= b = toLensLike l %%= \a -> (a, a `mappend` b)
+l <<<>= b = asLensLike l %%= \a -> (a, a `mappend` b)
 {-# INLINE (<<<>=) #-}
 
 -- | Run a monadic action, and set the target of 'Lens' to its result.
@@ -1242,7 +1229,7 @@ l <<<>= b = toLensLike l %%= \a -> (a, a `mappend` b)
 (<<~) :: forall s a b m k. (MonadState s m, AsLens k) => Optic k s s a b -> m b -> m b
 l <<~ mb = do
   b <- mb
-  modify $ \s -> ipeek b (runOptic (toLensLike (toLens l) :: ALens s s a b) sell s)
+  modify $ \s -> ipeek b (runOptic (asLensLike (asLens l) :: ALens s s a b) sell s)
   return b
 {-# INLINE (<<~) #-}
 
@@ -1447,6 +1434,6 @@ fusing t = Optic (\f -> lowerYoneda . runOptic t (liftYoneda . f))
 -- (<<~!) :: forall s a b m k. (MonadState s m, AsLensLike (Pretext (->) a b) k) => Optic k s s a b -> m b -> m b
 -- l <<~! mb = do
 --   b <- mb
---   modify $ \s -> ipeek b (runOptic (toLensLike l :: ALens s s a b) sell s)
+--   modify $ \s -> ipeek b (runOptic (asLensLike l :: ALens s s a b) sell s)
 --   return b
 -- {-# INLINE (<<~!) #-}

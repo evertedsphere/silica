@@ -46,8 +46,9 @@ module Silica.Essentials
   (
 
   -- * Make optics from simple functions
-    lens
-  , sets
+    ulens
+  , usets
+  , uto
 
   -- * Set the values of things focused on by an optic  
   -- | There are infix versions of these functions further down.
@@ -62,4 +63,5 @@ module Silica.Essentials
 
 import Silica.Lens
 import Silica.Setter
+import Silica.Getter
 import Silica.Type
