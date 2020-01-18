@@ -115,7 +115,7 @@ import Data.Tagged
 import Prelude
 import Data.Semigroup
 
-import GHC.TypeLits hiding (type (*))
+import GHC.TypeLits
 
 {-# ANN module "HLint: ignore Use camelCase" #-}
 

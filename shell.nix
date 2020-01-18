@@ -7,7 +7,7 @@ let
     # a particular `nixpkgs` commit.
     nixpkgsLock = ./nixpkgs.json;
 
-    ghcVersion = "ghc822";
+    ghcVersion = "ghc865";
 
     overrides = rec {
       jailbreak = [ "cabal-helper" "ghc-mod" "liquidhaskell" "streaming-utils" ];
@@ -28,16 +28,11 @@ in
 
     # Haskell dependencies
     deps = hsPkgs: with hsPkgs; [
-
       brittany
-      ghc-mod
-      cabal-helper
       hpack
       ghcid
       hlint
       stylish-haskell
-
-      ghc-proofs
 
       mtl
       constraints
@@ -81,7 +76,6 @@ in
     # Optionally, also add sets of related packages that are
     # commonly used together.
     depSets = hsPkgs: with (rien.package-sets hsPkgs); [
-      development-servers
     ];
 
     # Native dependencies

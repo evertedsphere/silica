@@ -31,8 +31,7 @@ library
   -- other-extensions:    
   hs-source-dirs:      src
   default-language:    Haskell2010
-  build-depends:       base >=4.10 && <4.11
-                     , ghc-proofs
+  build-depends:       base
 
                      , mtl
                      , constraints
